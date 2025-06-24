@@ -1,0 +1,66 @@
+Project Name: Khabo ki? – A Smart Food Discovery &
+Price Comparison Tool
+Goal:
+Make food discovery easy, smart, and cost-friendly for
+everyday users by helping them find the best-rated and
+best-priced dishes nearby across multiple food delivery
+platforms.
+Feature List :
+1. Location-Based Food Discovery
+● Suggests popular, top-rated dishes around the user
+using GPS or manual location input.
+2. Price Comparison Across Apps
+● Compares prices of the same food item across
+apps like Foodpanda, Uber Eats, Pathao, etc.
+● Directs users to the platform with the best price.
+3. Aggregated Ratings & Reviews
+● Collects and combines reviews from multiple
+platforms.
+● Displays an average score and highlights top
+comments.
+4. Smart Filters
+● Food type (e.g. snacks, meals)
+● Cuisine (e.g. Bengali, Chinese)
+● Price range
+● Dietary preferences (e.g. veg, halal)
+5. Search by Dish or Keyword
+● Users can search specific food items (e.g. "Burger",
+"Momo")
+● Results show all nearby options, sorted by rating
+and price.
+6. Trending & Popular Picks Nearby
+● Displays dishes that are being frequently ordered
+and rated highly in the user's area.
+7. "Surprise Me" Button
+● Suggests a random top-rated dish nearby based on
+current filters or user location.
+8. App Selector Toggle
+● Lets users choose which delivery apps they want to
+compare.
+● Filters out results from unselected platforms.
+9. Quick Info Tags
+● Auto-generated labels like "Spicy", "Budget Pick",
+"Underrated Gem", "Viral Dish" to make scanning
+results easier.
+Note:
+The focus is on keeping the tool lightweight, fast, and
+easy to use. No logins, no in-app ordering. Just quick,
+helpful suggestions to answer the daily question: "Khabo
+ki?
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//*[@id="__next"]/div[1]/main/section[2]/form/div/div/div[2]/div[2]/div[2]/div/div/div[1]/div[2]/div/a/div/div[2]/h6
+//*[@id="__next"]/div[1]/main/section[2]/form/div/div/div[2]/div[2]/div[2]/div/div/div[1]/div[1]/div/a/div/div[2]/h6
