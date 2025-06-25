@@ -8,9 +8,6 @@ class ScraperService:
         self.scrapers = {
             # "foodpanda": FoodPandaScraper(),
             "foodi": FoodiScraper(),
-            # Add more scrapers as they're implemented:
-            # "uber_eats": UberEatsScraper(),
-            # "pathao_food": PathaoFoodScraper(),
         }
 
     def scrape(self, scrape_request):
@@ -34,6 +31,7 @@ class ScraperService:
                 platform_results = scraper.scrape(
                     scrape_request.lat,
                     scrape_request.lng,
+                    scrape_request.text,
                     scrape_request.filters
                 )
 

@@ -17,7 +17,7 @@ class FoodiScraper(BaseScraper):
     def __init__(self):
         self.base_url = "https://foodibd.com"
 
-    def scrape(self, lat, lng, filters=None):
+    def scrape(self, lat, lng, text, filters=None):
         """
         Scrape restaurants from foodi.bd using Selenium
         """
@@ -49,8 +49,7 @@ class FoodiScraper(BaseScraper):
             location_input.clear()
             time.sleep(1)
 
-            # Use a simple, recognizable Dhaka location
-            location_text = "124/1, Matikata, Dhaka Cantonment, Dhaka, Bangladesh"
+            location_text = text
             print(f"[DEBUG] Setting location: {location_text}")
             location_input.send_keys(location_text)
             time.sleep(2)
@@ -88,7 +87,7 @@ class FoodiScraper(BaseScraper):
                 # Clear the modal input and set our location
                 modal_location_input.clear()
                 time.sleep(1)
-                modal_location_input.send_keys("Matikata")
+                modal_location_input.send_keys(text)
                 print("[DEBUG] Set location in modal input")
                 time.sleep(3)  # Wait for dropdown suggestions to appear
 
@@ -97,13 +96,16 @@ class FoodiScraper(BaseScraper):
                 suggestion_selected = False
 
                 try:
+                    location_parts = text.split(',')
+                    primary_location = location_parts[0].strip() if location_parts else text.strip()
+
                     # Try different selectors for suggestions
                     suggestion_selectors = [
                         "//div[contains(@class, 'p-autocomplete-items')]//li",
-                        "//div[contains(text(), 'Matikata')]",
-                        "//li[contains(text(), 'Matikata')]",
-                        "//*[contains(text(), 'Matikata') and contains(text(), 'Bangladesh')]",
-                        "//*[contains(text(), 'Matikata') and contains(text(), 'Dhaka')]"
+                        f"//div[contains(text(), '{primary_location}')]",
+                        f"//li[contains(text(), '{primary_location}')]",
+                        f"//*[contains(text(), '{primary_location}') and contains(text(), 'Bangladesh')]",
+                        f"//*[contains(text(), '{primary_location}') and contains(text(), 'Dhaka')]"
                     ]
 
                     for selector in suggestion_selectors:
@@ -121,8 +123,7 @@ class FoodiScraper(BaseScraper):
                                     suggestion_text = suggestion.text.strip()
                                     print(f"[DEBUG] Suggestion {i+1}: '{suggestion_text}'")
 
-                                    # Select suggestion that contains both "Matikata" and "Dhaka"
-                                    if ("matikata" in suggestion_text.lower() and
+                                    if (primary_location.lower() in suggestion_text.lower() and
                                         "dhaka" in suggestion_text.lower() and
                                             len(suggestion_text) > 10):
 
@@ -160,9 +161,7 @@ class FoodiScraper(BaseScraper):
                     # Look for any clickable elements that might be suggestions
                     try:
                         all_suggestions = driver.find_elements(
-                            By.XPATH, "//*[contains(text(), 'Matikata')]")
-                        print(
-                            f"[DEBUG] Found {len(all_suggestions)} elements containing 'Matikata'")
+                            By.XPATH, f"//*[contains(text(), '{primary_location}')]")
 
                         for suggestion in all_suggestions:
                             suggestion_text = suggestion.text.strip()
@@ -170,7 +169,7 @@ class FoodiScraper(BaseScraper):
 
                             # Check if this looks like a location suggestion
                             if (len(suggestion_text) > 10 and
-                                "matikata" in suggestion_text.lower() and
+                                primary_location.lower() in suggestion_text.lower() and
                                     ("dhaka" in suggestion_text.lower() or "bangladesh" in suggestion_text.lower())):
 
                                 try:

@@ -31,6 +31,7 @@ def scrape():
     {
         "lat": 23.82257,
         "lng": 90.39329,
+        "text": "location name",
         "filters": {
             "cuisine": "...",
             "price_range": "...",
