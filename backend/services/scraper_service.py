@@ -6,7 +6,7 @@ class ScraperService:
         # Initialize the scrapers
         print("Initializing scrapers...")
         self.scrapers = {
-            # "foodpanda": FoodPandaScraper(),
+            "foodpanda": FoodPandaScraper(),
             "foodi": FoodiScraper(),
         }
 
