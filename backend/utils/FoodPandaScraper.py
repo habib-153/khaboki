@@ -91,6 +91,47 @@ class FoodPandaScraper(BaseScraper):
                             restaurant_elem.find('h2')
                     name = name_elem.text.strip() if name_elem else "Unknown Restaurant"
 
+                    offers = []
+                    try:
+                        offer_selectors = [
+                            # Primary offer tags (like "10% off Tk. 300")
+                            'span[class*="bds-c-tag__label"]:contains("off")',
+                            'div[class*="revamped-primary-tag"]',
+                            'span[data-testid="DISCOUNT"]',
+                            'div[id*="revamped-primary-tag"]',
+                            # Secondary offer tags
+                            'span[class*="promoted-tag"]',
+                            'div[class*="bds-c-tag"][class*="sponsored"]',
+                            # Generic offer containers
+                            '[class*="offer"]',
+                            '[class*="discount"]',
+                            '[class*="promo"]'
+                        ]
+
+                        for selector in offer_selectors:
+                            offer_elements = restaurant_elem.select(selector)
+                            for offer_elem in offer_elements:
+                                offer_text = offer_elem.get_text(strip=True)
+
+                                # Filter valid offers
+                                if (offer_text and
+                                    len(offer_text) > 2 and
+                                    any(keyword in offer_text.lower() for keyword in ['off', '%', 'tk', 'free', 'discount', 'buy', 'get', 'deal']) and
+                                        offer_text not in offers):
+                                    offers.append(offer_text)
+                                    print(f"[DEBUG] Found offer: {offer_text}")
+                        
+                        data_offers = restaurant_elem.find_all(
+                            attrs={"data-testid": lambda x: x and "tag" in x.lower()})
+                        for data_offer in data_offers:
+                            offer_text = data_offer.get_text(strip=True)
+                            if (offer_text and
+                                any(keyword in offer_text.lower() for keyword in ['off', '%', 'tk', 'free', 'discount']) and
+                                    offer_text not in offers):
+                                offers.append(offer_text)
+                    except Exception as e:
+                        print(f"[DEBUG] Error extracting offers: {str(e)}")
+
                     # Rating and review count
                     try:
                         # Get the rating
@@ -170,7 +211,8 @@ class FoodPandaScraper(BaseScraper):
                         delivery_fee=delivery_fee,
                         platform="FoodPanda",
                         image_url=image_url,
-                        url=restaurant_url
+                        url=restaurant_url,
+                        offers=offers
                     )
                     
                     restaurants.append(restaurant)

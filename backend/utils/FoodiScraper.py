@@ -259,11 +259,8 @@ class FoodiScraper(BaseScraper):
 
             # Target only actual restaurant cards, not filter elements
             restaurant_xpaths = [
-                # Target restaurant cards specifically (exclude filters)
                 "//div[contains(@class, 'col-12') and contains(@class, 'sm:col-6') and contains(@class, 'md:col-6') and contains(@class, 'lg:col-4')]//a[contains(@href, '/restaurant/')]",
-                # Alternative: restaurant item cards
                 "//div[contains(@class, 'restaurant-item-card')]//a[contains(@href, '/restaurant/')]",
-                # Direct restaurant links in grid
                 "//div[contains(@class, 'grid')]//a[contains(@href, '/restaurant/')]",
             ]
 
@@ -275,7 +272,6 @@ class FoodiScraper(BaseScraper):
                     restaurant_elements = elements
                     break
 
-            # If no restaurant links found, try getting restaurant cards directly
             if not restaurant_elements:
                 print("[DEBUG] No restaurant links found, trying restaurant card containers...")
                 # Target the actual restaurant card containers
@@ -415,7 +411,69 @@ class FoodiScraper(BaseScraper):
                     except:
                         pass
 
-                    # Create restaurant object
+                    offers = []
+                    try:
+                        offer_xpaths = [
+                            ".//div[contains(@class, 'div-1')]//div[contains(@class, 'div-2')]//span",
+                            # Alternative patterns based on your XPath structure
+                            ".//div/div[1]/div[2]/div/div[2]/span",
+                            ".//div/div[1]/div[2]//span",
+                            # Generic offer patterns for Foodi
+                            ".//*[contains(text(), 'Off') or contains(text(), 'off')]",
+                            ".//*[contains(text(), 'Flat') and contains(text(), '%')]",
+                            ".//*[contains(text(), 'Get') and contains(text(), 'Off')]",
+                            ".//*[contains(text(), 'Free') and contains(text(), 'delivery')]",
+                            ".//*[contains(text(), 'Buy') and contains(text(), 'Get')]",
+                            ".//span[contains(text(), '%')]",
+                            ".//span[contains(text(), 'discount')]",
+                            ".//span[contains(text(), 'promo')]"
+                        ]
+
+                        for xpath in offer_xpaths:
+                            try:
+                                offer_elements = element.find_elements(
+                                    By.XPATH, xpath)
+                                for offer_elem in offer_elements:
+                                    offer_text = offer_elem.text.strip()
+
+                                    if (offer_text and
+                                        len(offer_text) > 2 and
+                                        len(offer_text) < 100 and
+                                        any(keyword in offer_text.lower() for keyword in ['off', '%', 'free', 'discount', 'buy', 'get', 'flat', 'promo']) and
+                                        not any(exclude in offer_text.lower() for exclude in ['min', 'delivery time', 'rating', 'review']) and
+                                            offer_text not in offers):
+
+                                        offers.append(offer_text)
+                                        print(
+                                            f"[DEBUG] Found Foodi offer: {offer_text}")
+                            except:
+                                continue
+                        try:
+                            card_text = element.text
+                            import re
+
+                            percent_offers = re.findall(
+                                r'(?:Flat\s+)?(\d+%\s+[Oo]ff)', card_text, re.IGNORECASE)
+                            for offer in percent_offers:
+                                formatted_offer = f"Flat {offer}" if not offer.lower(
+                                ).startswith('flat') else offer
+                                if formatted_offer not in offers:
+                                    offers.append(formatted_offer)
+
+                            buy_get_offers = re.findall(
+                                r'(Buy\s+\d+\s+Get\s+\d+[^.]*)', card_text, re.IGNORECASE)
+                            for offer in buy_get_offers:
+                                if offer.strip() not in offers:
+                                    offers.append(offer.strip())
+
+                            if re.search(r'free\s+delivery', card_text, re.IGNORECASE) and "Free delivery" not in offers:
+                                offers.append("Free delivery")
+                        except Exception as regex_error:
+                            print(f"[DEBUG] Regex extraction error: {regex_error}")
+                    except Exception as e:
+                        print(f"[DEBUG] Error extracting Foodi offers: {e}")
+                    
+
                     restaurant = Restaurant(
                         name=name,
                         cuisine_type=cuisine_type,
@@ -424,7 +482,8 @@ class FoodiScraper(BaseScraper):
                         delivery_fee=delivery_fee,
                         platform="Foodi",
                         image_url=image_url,
-                        url=url
+                        url=url,
+                        offers=offers
                     )
 
                     restaurants.append(restaurant)
@@ -435,11 +494,9 @@ class FoodiScraper(BaseScraper):
                     print(f"[DEBUG] Error extracting restaurant {i+1}: {e}")
                     continue
 
-            # If we got very few restaurants, try alternative extraction
             if len(restaurants) < 5:
                 print("[DEBUG] Got very few restaurants, trying alternative extraction...")
 
-                # Look for all h6 elements that contain restaurant names
                 h6_elements = driver.find_elements(
                     By.XPATH, "//h6[string-length(text()) > 5]")
 
@@ -447,19 +504,15 @@ class FoodiScraper(BaseScraper):
                     try:
                         name = h6_elem.text.strip()
 
-                        # Skip filter elements
                         if name.lower() in ['filters', 'sort by'] or 'price range' in name.lower() or 'delivery time' in name.lower():
                             continue
 
                         print(f"[DEBUG] Alternative extraction {i+1}: {name}")
 
-                        # Try to get parent container for additional info
                         try:
-                            # Go up to restaurant card container
                             card_container = h6_elem.find_element(
                                 By.XPATH, "./ancestor::div[contains(@class, 'col')]")
 
-                            # Extract URL from card
                             url = "https://foodibd.com"
                             try:
                                 link_elem = card_container.find_element(
@@ -470,7 +523,6 @@ class FoodiScraper(BaseScraper):
                             except:
                                 pass
 
-                            # Extract image
                             image_url = "https://via.placeholder.com/300x200?text=No+Image"
                             try:
                                 img_elem = card_container.find_element(By.XPATH, ".//img")
@@ -480,7 +532,6 @@ class FoodiScraper(BaseScraper):
                             except:
                                 pass
 
-                            # Create restaurant
                             restaurant = Restaurant(
                                 name=name,
                                 cuisine_type="Not specified",
@@ -492,7 +543,6 @@ class FoodiScraper(BaseScraper):
                                 url=url
                             )
 
-                            # Check if we already have this restaurant
                             if not any(r.name == name for r in restaurants):
                                 restaurants.append(restaurant)
                                 print(

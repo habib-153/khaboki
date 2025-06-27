@@ -121,7 +121,7 @@ export function SearchFilters({ onFilterChange }: SearchFiltersProps) {
           <div className="space-y-2">
             <Label>Platforms</Label>
             <div className="flex flex-wrap gap-2">
-              {["foodpanda", "ubereats", "pathao"].map((platform) => (
+              {["foodpanda", "foodi"].map((platform) => (
                 <Badge
                   key={platform}
                   variant={
