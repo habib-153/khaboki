@@ -16,7 +16,7 @@ class FoodPandaScraper(BaseScraper):
     def __init__(self):
         self.base_url = "https://www.foodpanda.com.bd/restaurants/new"
 
-    def scrape(self, lat, lng, filters=None):
+    def scrape(self, lat, lng, text, filters=None):
         """Scrape FoodPanda for restaurants near the given coordinates"""
         url = f"{self.base_url}?lng={lng}&lat={lat}&vertical=restaurants"
         print(f"[DEBUG] Starting to scrape URL: {url}")

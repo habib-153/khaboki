@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { text } from "stream/consumers";
 
 // Type definitions
 interface Restaurant {
@@ -27,12 +28,11 @@ interface Restaurant {
   platform: string;
   image_url: string;
   url: string;
-  menu_items: any[];
 }
 
 interface ScrapeResults {
   foodpanda: Restaurant[];
-  // Add other platforms here as needed
+  foodie: Restaurant[];
 }
 
 export default function Home() {
@@ -193,10 +193,10 @@ export default function Home() {
   };
 
   const fetchRestaurants = async () => {
-    if (!selectedLocation) {
-      setError("Please select a location first");
-      return;
-    }
+    // if (!selectedLocation) {
+    //   setError("Please select a location first");
+    //   return;
+    // }
 
     setIsLoading(true);
     setError(null);
@@ -208,9 +208,15 @@ export default function Home() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          lat: selectedLocation.lat,
-          lng: selectedLocation.lng,
+          lat: '23.8103',
+          lng: '90.4125',
+          text: 'Matikata',
         }),
+        // body: JSON.stringify({
+        //   lat: selectedLocation.lat,
+        //   lng: selectedLocation.lng,
+        //   text: searchValue,
+        // }),
       });
 
       const data = await response.json();

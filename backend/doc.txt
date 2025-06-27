@@ -11,7 +11,7 @@ Feature List :
 using GPS or manual location input.
 2. Price Comparison Across Apps
 ● Compares prices of the same food item across
-apps like Foodpanda, Uber Eats, Pathao, etc.
+apps like Foodpanda, foodi
 ● Directs users to the platform with the best price.
 3. Aggregated Ratings & Reviews
 ● Collects and combines reviews from multiple
