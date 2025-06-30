@@ -21,14 +21,16 @@ import { calculateBayesianRating } from "@/lib/calculateBayesianRating";
 interface RestaurantGridProps {
   restaurants: ScrapeResults;
   filters: SearchFiltersType;
+  cuisineSearch?: string;
 }
 
-export function RestaurantGrid({ restaurants, filters }: RestaurantGridProps) {
+export function RestaurantGrid({
+  restaurants,
+  filters,
+  cuisineSearch = "",
+}: RestaurantGridProps) {
   const [compareList, setCompareList] = useState<Restaurant[]>([]);
   const [showComparison, setShowComparison] = useState(false);
-  const [sortBy, setSortBy] = useState<"rating" | "name" | "delivery_time">(
-    "rating"
-  );
   const [useBayesianRating, setUseBayesianRating] = useState(true);
 
   const allRestaurants = [
@@ -36,8 +38,39 @@ export function RestaurantGrid({ restaurants, filters }: RestaurantGridProps) {
     ...(restaurants.foodi || []),
   ];
 
-  const foodpandaCount = restaurants.foodpanda?.length || 0;
-  const foodiCount = restaurants.foodi?.length || 0;
+  // Filter restaurants based on search
+  const filteredRestaurants = allRestaurants.filter((restaurant) => {
+    if (!cuisineSearch) return true;
+
+    const searchLower = cuisineSearch.toLowerCase();
+    return (
+      restaurant.name.toLowerCase().includes(searchLower) ||
+      restaurant.cuisine_type.toLowerCase().includes(searchLower)
+    );
+  });
+
+  const foodpandaFiltered = (restaurants.foodpanda || []).filter(
+    (restaurant) => {
+      if (!cuisineSearch) return true;
+      const searchLower = cuisineSearch.toLowerCase();
+      return (
+        restaurant.name.toLowerCase().includes(searchLower) ||
+        restaurant.cuisine_type.toLowerCase().includes(searchLower)
+      );
+    }
+  );
+
+  const foodiFiltered = (restaurants.foodi || []).filter((restaurant) => {
+    if (!cuisineSearch) return true;
+    const searchLower = cuisineSearch.toLowerCase();
+    return (
+      restaurant.name.toLowerCase().includes(searchLower) ||
+      restaurant.cuisine_type.toLowerCase().includes(searchLower)
+    );
+  });
+
+  const foodpandaCount = foodpandaFiltered.length;
+  const foodiCount = foodiFiltered.length;
 
   const handleCompare = (restaurant: Restaurant) => {
     if (
@@ -47,7 +80,6 @@ export function RestaurantGrid({ restaurants, filters }: RestaurantGridProps) {
       const newCompareList = [...compareList, restaurant];
       setCompareList(newCompareList);
 
-      // Auto-open comparison modal when 2+ restaurants are selected
       if (newCompareList.length >= 2) {
         setShowComparison(true);
       }
@@ -65,7 +97,7 @@ export function RestaurantGrid({ restaurants, filters }: RestaurantGridProps) {
 
   const sortRestaurants = (restaurants: Restaurant[]) => {
     return [...restaurants].sort((a, b) => {
-      switch (sortBy) {
+      switch (filters.sortBy) {
         case "rating":
           const ratingA = calculateBayesianRating(
             a.rating,
@@ -76,8 +108,6 @@ export function RestaurantGrid({ restaurants, filters }: RestaurantGridProps) {
             "all"
           ).adjustedRating;
           return ratingB - ratingA;
-        case "name":
-          return a.name.localeCompare(b.name);
         case "delivery_time":
           const timeA = parseInt(a.delivery_time.match(/(\d+)/)?.[1] || "999");
           const timeB = parseInt(b.delivery_time.match(/(\d+)/)?.[1] || "999");
@@ -94,66 +124,41 @@ export function RestaurantGrid({ restaurants, filters }: RestaurantGridProps) {
 
   return (
     <div className="space-y-6">
-      {/* <div className="flex items-center gap-4">
-        <div className="flex items-center space-x-2">
-          <Switch
-            id="bayesian-rating"
-            checked={useBayesianRating}
-            onCheckedChange={setUseBayesianRating}
-          />
-          <Label htmlFor="bayesian-rating">Use Bayesian Rating</Label>
-        </div>
-      </div> */}
       {/* Results Summary */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <h2 className="text-2xl font-bold">
-            Found {allRestaurants.length} restaurants
+          <h2 className="text-2xl font-bold text-surface-900">
+            Found {filteredRestaurants.length} restaurants
+            {cuisineSearch && (
+              <span className="text-lg font-normal text-surface-600 ml-2">
+                for &quot;{cuisineSearch}&quot;
+              </span>
+            )}
           </h2>
           <div className="flex gap-2">
             {foodpandaCount > 0 && (
-              <Badge variant="secondary" className="bg-pink-100 text-pink-800">
+              <Badge
+                variant="secondary"
+                className="bg-platform-foodpanda/10 text-platform-foodpanda border-platform-foodpanda/20"
+              >
                 FoodPanda: {foodpandaCount}
               </Badge>
             )}
             {foodiCount > 0 && (
-              <Badge variant="secondary" className="bg-red-100 text-red-800">
+              <Badge
+                variant="secondary"
+                className="bg-platform-foodi/10 text-platform-foodi border-platform-foodi/20"
+              >
                 Foodi: {foodiCount}
               </Badge>
             )}
           </div>
         </div>
-
-        {/* Sort Options */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-600">Sort by:</span>
-          <Button
-            variant={sortBy === "rating" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setSortBy("rating")}
-          >
-            Rating
-          </Button>
-          <Button
-            variant={sortBy === "delivery_time" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setSortBy("delivery_time")}
-          >
-            Delivery Time
-          </Button>
-          <Button
-            variant={sortBy === "name" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setSortBy("name")}
-          >
-            Name
-          </Button>
-        </div>
       </div>
 
       {/* Compare Section */}
       {compareList.length > 0 && (
-        <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+        <div className="bg-blue-50 p-4 rounded-xl border border-blue-200">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-semibold text-blue-900">
               Comparing ({compareList.length}/3)
@@ -185,7 +190,7 @@ export function RestaurantGrid({ restaurants, filters }: RestaurantGridProps) {
                 variant="outline"
                 size="sm"
                 onClick={clearCompareList}
-                className="text-red-600 hover:text-red-700"
+                className="text-red-600 hover:text-red-700 border-red-200 hover:bg-red-50"
               >
                 <X size={16} className="mr-1" />
                 Clear All
@@ -222,19 +227,24 @@ export function RestaurantGrid({ restaurants, filters }: RestaurantGridProps) {
 
       {/* Platform Tabs */}
       <Tabs defaultValue="all" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="all">
-            All Platforms ({allRestaurants.length})
+        <TabsList className="grid w-full grid-cols-3 bg-surface-100">
+          <TabsTrigger value="all" className="data-[state=active]:bg-white">
+            All Platforms ({filteredRestaurants.length})
           </TabsTrigger>
-          <TabsTrigger value="foodpanda">
+          <TabsTrigger
+            value="foodpanda"
+            className="data-[state=active]:bg-white"
+          >
             FoodPanda ({foodpandaCount})
           </TabsTrigger>
-          <TabsTrigger value="foodi">Foodi ({foodiCount})</TabsTrigger>
+          <TabsTrigger value="foodi" className="data-[state=active]:bg-white">
+            Foodi ({foodiCount})
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="all" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {sortRestaurants(allRestaurants).map((restaurant, index) => (
+            {sortRestaurants(filteredRestaurants).map((restaurant, index) => (
               <RestaurantCard
                 key={`${restaurant.platform}-${index}`}
                 restaurant={restaurant}
@@ -249,35 +259,31 @@ export function RestaurantGrid({ restaurants, filters }: RestaurantGridProps) {
 
         <TabsContent value="foodpanda" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {sortRestaurants(restaurants.foodpanda || []).map(
-              (restaurant, index) => (
-                <RestaurantCard
-                  key={`foodpanda-${index}`}
-                  restaurant={restaurant}
-                  onCompare={handleCompare}
-                  showCompareButton={compareList.length < 3}
-                  isInCompareList={isRestaurantInCompareList(restaurant)}
-                  useBayesianRating={useBayesianRating}
-                />
-              )
-            )}
+            {sortRestaurants(foodpandaFiltered).map((restaurant, index) => (
+              <RestaurantCard
+                key={`foodpanda-${index}`}
+                restaurant={restaurant}
+                onCompare={handleCompare}
+                showCompareButton={compareList.length < 3}
+                isInCompareList={isRestaurantInCompareList(restaurant)}
+                useBayesianRating={useBayesianRating}
+              />
+            ))}
           </div>
         </TabsContent>
 
         <TabsContent value="foodi" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {sortRestaurants(restaurants.foodi || []).map(
-              (restaurant, index) => (
-                <RestaurantCard
-                  key={`foodi-${index}`}
-                  restaurant={restaurant}
-                  onCompare={handleCompare}
-                  showCompareButton={compareList.length < 3}
-                  isInCompareList={isRestaurantInCompareList(restaurant)}
-                  useBayesianRating={useBayesianRating}
-                />
-              )
-            )}
+            {sortRestaurants(foodiFiltered).map((restaurant, index) => (
+              <RestaurantCard
+                key={`foodi-${index}`}
+                restaurant={restaurant}
+                onCompare={handleCompare}
+                showCompareButton={compareList.length < 3}
+                isInCompareList={isRestaurantInCompareList(restaurant)}
+                useBayesianRating={useBayesianRating}
+              />
+            ))}
           </div>
         </TabsContent>
       </Tabs>

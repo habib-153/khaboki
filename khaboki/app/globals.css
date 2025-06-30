@@ -8,6 +8,8 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  
+  /* Add all your existing color mappings */
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -37,6 +39,30 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+
+  /* Add custom brand colors */
+  --color-brand-primary: var(--brand-primary);
+  --color-brand-secondary: var(--brand-secondary);
+  --color-brand-accent: var(--brand-accent);
+  --color-brand-success: var(--brand-success);
+  --color-brand-danger: var(--brand-danger);
+
+  /* Add surface colors */
+  --color-surface-50: var(--surface-50);
+  --color-surface-100: var(--surface-100);
+  --color-surface-200: var(--surface-200);
+  --color-surface-300: var(--surface-300);
+  --color-surface-400: var(--surface-400);
+  --color-surface-500: var(--surface-500);
+  --color-surface-600: var(--surface-600);
+  --color-surface-700: var(--surface-700);
+  --color-surface-800: var(--surface-800);
+  --color-surface-900: var(--surface-900);
+
+  /* Add platform colors */
+  --color-platform-foodpanda: var(--platform-foodpanda);
+  --color-platform-foodi: var(--platform-foodi);
+
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -76,6 +102,29 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+
+  /* Custom brand colors */
+  --brand-primary: oklch(0.4 0.2 250); /* Blue */
+  --brand-secondary: oklch(0.6 0.15 280); /* Purple */
+  --brand-accent: oklch(0.7 0.2 45); /* Orange */
+  --brand-success: oklch(0.6 0.15 140); /* Green */
+  --brand-danger: oklch(0.6 0.2 20); /* Red */
+
+  /* Surface colors */
+  --surface-50: oklch(0.98 0 0);
+  --surface-100: oklch(0.96 0 0);
+  --surface-200: oklch(0.92 0 0);
+  --surface-300: oklch(0.88 0 0);
+  --surface-400: oklch(0.7 0 0);
+  --surface-500: oklch(0.56 0 0);
+  --surface-600: oklch(0.45 0 0);
+  --surface-700: oklch(0.35 0 0);
+  --surface-800: oklch(0.25 0 0);
+  --surface-900: oklch(0.15 0 0);
+
+  /* Platform colors */
+  --platform-foodpanda: oklch(0.5 0.2 330); /* Pink */
+  --platform-foodi: oklch(0.5 0.2 15); /* Red-orange */
 }
 
 .dark {
@@ -110,6 +159,29 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+
+  /* Dark mode brand colors */
+  --brand-primary: oklch(0.6 0.2 250);
+  --brand-secondary: oklch(0.7 0.15 280);
+  --brand-accent: oklch(0.8 0.2 45);
+  --brand-success: oklch(0.7 0.15 140);
+  --brand-danger: oklch(0.7 0.2 20);
+
+  /* Dark mode surface colors */
+  --surface-50: oklch(0.15 0 0);
+  --surface-100: oklch(0.2 0 0);
+  --surface-200: oklch(0.25 0 0);
+  --surface-300: oklch(0.3 0 0);
+  --surface-400: oklch(0.4 0 0);
+  --surface-500: oklch(0.5 0 0);
+  --surface-600: oklch(0.6 0 0);
+  --surface-700: oklch(0.7 0 0);
+  --surface-800: oklch(0.8 0 0);
+  --surface-900: oklch(0.9 0 0);
+
+  /* Dark mode platform colors */
+  --platform-foodpanda: oklch(0.6 0.2 330);
+  --platform-foodi: oklch(0.6 0.2 15);
 }
 
 .pac-container {

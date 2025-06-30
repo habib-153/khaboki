@@ -3,8 +3,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { MapPin, Search, Loader2, Star, Clock, DollarSign, Info, RefreshCw } from "lucide-react";
-import { SearchFilters } from "@/components/seacrhFilter";
+import { MapPin, Search, Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -16,8 +15,10 @@ import { Badge } from "@/components/ui/badge";
 import { RestaurantCache } from "@/lib/RestaurantCache";
 import { EmptyState, LoadingState } from "@/components/Loading";
 import { RestaurantGrid } from "@/components/RestaurantGrid";
-import { LocationCoordinates, ScrapeResults, SearchFiltersType, Restaurant } from "@/types";
-import { DatasetManager } from "@/components/DatasetManager";
+import { ScrapeResults, SearchFiltersType } from "@/types";
+
+import { useSurpriseRestaurant } from "@/hooks/useSurpriseRestaurant";
+import { SurpriseModal } from "@/components/SurpriseModal";
 
 export default function Home() {
   const [searchValue, setSearchValue] = useState<string>("");
@@ -36,6 +37,22 @@ export default function Home() {
     maxDeliveryFee: 100,
     sortBy: "rating",
   });
+
+  // Search and filter states
+  const [cuisineSearch, setCuisineSearch] = useState<string>("");
+  const [sortBy, setSortBy] = useState<"rating" | "delivery_time">("rating");
+
+  const {
+    getSurpriseRestaurant,
+    surpriseRestaurant,
+    isLoading: surpriseLoading,
+    setSurpriseRestaurant,
+    previousSuggestions,
+    resetSuggestions,
+  } = useSurpriseRestaurant();
+
+  const [showSurpriseModal, setShowSurpriseModal] = useState(false);
+
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const [cacheInfo, setCacheInfo] = useState<{
     hasCache: boolean;
@@ -57,7 +74,6 @@ export default function Home() {
   const initializeMap = useCallback(() => {
     if (!mapContainerRef.current) return;
 
-    // Default center (Dhaka, Bangladesh based on sample coordinates)
     const defaultCenter = { lat: 23.8103, lng: 90.4125 };
 
     const mapOptions: google.maps.MapOptions = {
@@ -78,7 +94,6 @@ export default function Home() {
     const map = new window.google.maps.Map(mapContainerRef.current, mapOptions);
     mapRef.current = map;
 
-    // Create a marker
     const marker = new window.google.maps.Marker({
       position: defaultCenter,
       map: map,
@@ -87,7 +102,6 @@ export default function Home() {
     });
     markerRef.current = marker;
 
-    // Handle marker drag
     marker.addListener("dragend", () => {
       const position = marker.getPosition();
       if (position) {
@@ -158,7 +172,6 @@ export default function Home() {
       googleMapScript.defer = true;
       window.document.body.appendChild(googleMapScript);
 
-      // Define global callback
       window.initMap = initializeMap;
 
       return () => {
@@ -174,19 +187,6 @@ export default function Home() {
     }
   }, [initializeMap]);
 
-  const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setSearchValue(value);
-
-    if (value.length < 3) {
-      setSuggestions([]);
-      setShowSuggestions(false);
-      return;
-    }
-
-    setShowSuggestions(true);
-  };
-
   useEffect(() => {
     const cached = RestaurantCache.load();
     if (cached) {
@@ -198,11 +198,6 @@ export default function Home() {
   }, []);
 
   const fetchRestaurants = async (forceRefresh = false) => {
-    // if (!selectedLocation) {
-    //   setError("Please select a location first");
-    //   return;
-    // }
-
     const currentLocation = selectedLocation || { lat: 23.8103, lng: 90.4125 };
     const currentSearchText = searchValue || "Matikata";
 
@@ -233,11 +228,6 @@ export default function Home() {
           lng: 90.4125,
           text: "Matikata",
         }),
-        // body: JSON.stringify({
-        //   lat: currentLocation.lat,
-        //   lng: currentLocation.lng,
-        //   text: currentSearchText,
-        // }),
       });
 
       const data = await response.json();
@@ -266,119 +256,6 @@ export default function Home() {
     }
   };
 
-  const handleSearchLocation = async (): Promise<void> => {
-    if (!window.google || !searchValue) return;
-
-    const geocoder = new window.google.maps.Geocoder();
-
-    geocoder.geocode(
-      { address: searchValue },
-      (
-        results: google.maps.GeocoderResult[] | null,
-        status: google.maps.GeocoderStatus
-      ) => {
-        if (status === "OK" && results && results[0] && results[0].geometry) {
-          const location: LocationCoordinates = {
-            lat: results[0].geometry.location.lat(),
-            lng: results[0].geometry.location.lng(),
-          };
-
-          setSelectedLocation(location);
-
-          if (mapRef.current && markerRef.current) {
-            mapRef.current.setCenter(location);
-            markerRef.current.setPosition(location);
-            mapRef.current.setZoom(15);
-          }
-        } else {
-          setError("Location not found. Please try another search term.");
-        }
-      }
-    );
-  };
-
-  const handleFilterChange = (newFilters: SearchFiltersType): void => {
-    setFilters(newFilters);
-
-    if (restaurants) {
-      const filteredResults = applyFilters(restaurants, newFilters);
-      setRestaurants(filteredResults);
-    }
-  };
-
-  const applyFilters = (
-    results: ScrapeResults,
-    filterOptions: SearchFiltersType
-  ): ScrapeResults => {
-    const filterRestaurants = (restaurantList: Restaurant[]): Restaurant[] => {
-      return restaurantList
-        .filter((restaurant) => {
-          // Filter by cuisine type
-          if (
-            filterOptions.cuisineType &&
-            !restaurant.cuisine_type
-              .toLowerCase()
-              .includes(filterOptions.cuisineType.toLowerCase())
-          ) {
-            return false;
-          }
-
-          // Filter by platform
-          if (
-            !filterOptions.platforms.includes(restaurant.platform.toLowerCase())
-          ) {
-            return false;
-          }
-
-          // Filter by rating
-          const rating = parseFloat(restaurant.rating.replace(/[^\d.]/g, ""));
-          if (!isNaN(rating) && rating < filterOptions.minRating) {
-            return false;
-          }
-
-          // Filter by delivery time
-          const timeMatch = restaurant.delivery_time.match(/\d+/);
-          if (timeMatch) {
-            const deliveryTime = parseInt(timeMatch[0]);
-            if (deliveryTime > filterOptions.maxDeliveryTime) {
-              return false;
-            }
-          }
-
-          return true;
-        })
-        .sort((a, b) => {
-          // Sort based on selected criteria
-          switch (filterOptions.sortBy) {
-            case "rating":
-              const ratingA = parseFloat(a.rating.replace(/[^\d.]/g, "")) || 0;
-              const ratingB = parseFloat(b.rating.replace(/[^\d.]/g, "")) || 0;
-              return ratingB - ratingA; // Higher rating first
-
-            case "delivery_time":
-              const timeA = parseInt(
-                a.delivery_time.match(/\d+/)?.[0] || "999"
-              );
-              const timeB = parseInt(
-                b.delivery_time.match(/\d+/)?.[0] || "999"
-              );
-              return timeA - timeB; // Faster delivery first
-
-            case "name":
-              return a.name.localeCompare(b.name);
-
-            default:
-              return 0;
-          }
-        });
-    };
-
-    return {
-      foodpanda: results.foodpanda ? filterRestaurants(results.foodpanda) : [],
-      foodi: results.foodi ? filterRestaurants(results.foodi) : [],
-    };
-  };
-
   const clearCache = () => {
     RestaurantCache.clear();
     setCacheInfo({ hasCache: false });
@@ -388,76 +265,117 @@ export default function Home() {
   const hasResults =
     restaurants && (restaurants.foodpanda?.length || restaurants.foodi?.length);
 
+  const handleSurpriseMe = async () => {
+    if (!restaurants) {
+      setError("Please search for restaurants first");
+      return;
+    }
+
+    setShowSurpriseModal(true);
+    await getSurpriseRestaurant(restaurants, filters, false);
+  };
+
+  const handleRefreshSurprise = async () => {
+    if (restaurants) {
+      await getSurpriseRestaurant(restaurants, filters, true);
+    }
+  };
+
+  const handleCloseSurpriseModal = () => {
+    setShowSurpriseModal(false);
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Khabo ki?</h1>
-              <p className="text-gray-600 mt-1">
-                Find and compare the best food delivery options
-              </p>
+    <div className="min-h-screen bg-surface-50">
+      {/* Modern Header */}
+      <header className="bg-white/80 backdrop-blur-lg border-b border-surface-200 sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between py-4">
+            {/* Logo and Title */}
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-brand-primary to-brand-secondary rounded-xl flex items-center justify-center">
+                <span className="text-white font-bold text-lg">K</span>
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-brand-primary to-brand-secondary bg-clip-text text-transparent">
+                  Khabo ki?
+                </h1>
+                <p className="text-surface-600  text-sm">
+                  Find your perfect meal
+                </p>
+              </div>
             </div>
 
+            {/* Cache Info */}
             {cacheInfo.hasCache && (
-              <div className="flex items-center gap-2">
-                <Badge variant="outline" className="text-green-600">
-                  <Info size={12} className="mr-1" />
+              <div className="flex items-center gap-3">
+                <Badge
+                  variant="outline"
+                  className="bg-brand-success/10 text-brand-success border-brand-success/20"
+                >
+                  <div className="w-2 h-2 bg-brand-success rounded-full mr-2"></div>
                   Cached {cacheInfo.age}m ago
                 </Badge>
-                <Button variant="ghost" size="sm" onClick={clearCache}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearCache}
+                  className="text-surface-600 hover:text-surface-900"
+                >
                   Clear Cache
                 </Button>
               </div>
             )}
-            <DatasetManager />
           </div>
         </div>
       </header>
 
       {/* Main content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Location selection section */}
-        <Card className="mb-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        {/* Location Selection Card */}
+        <Card className="border-0 shadow-lg bg-white/70 backdrop-blur-sm">
           <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">Select your location</h2>
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-xl font-semibold text-surface-900">
+                  Select your location
+                </h2>
+                <p className="text-surface-600 text-sm mt-1">
+                  Choose where you want to order from
+                </p>
+              </div>
               {hasResults && (
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => fetchRestaurants(true)}
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 border-brand-primary/20 text-brand-primary hover:bg-brand-primary/5"
                 >
                   <RefreshCw size={16} />
-                  Refresh Results
+                  Refresh
                 </Button>
               )}
             </div>
 
             {/* Search input */}
-            <div className="mb-4 flex">
-              <div className="relative flex-grow">
-                <div className="relative">
-                  <Input
-                    id="location-search"
-                    placeholder="Enter your address..."
-                    value={searchValue}
-                    onChange={(e) => setSearchValue(e.target.value)}
-                    className="pr-10 rounded-r-none"
-                  />
-                  <MapPin
-                    size={18}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-                  />
-                </div>
+            <div className="mb-6 flex gap-3">
+              <div className="relative flex-1">
+                <Input
+                  id="location-search"
+                  placeholder="Enter your address..."
+                  value={searchValue}
+                  onChange={(e) => setSearchValue(e.target.value)}
+                  className="pl-10 h-12 border-surface-300 focus:border-brand-primary focus:ring-brand-primary/20"
+                />
+                <MapPin
+                  size={18}
+                  className="absolute left-3 top-1/2 transform -translate-y-1/2 text-surface-400"
+                />
               </div>
               <Button
                 onClick={() => fetchRestaurants()}
                 disabled={isLoading}
-                className="rounded-l-none bg-green-600 hover:bg-green-700"
+                className="h-12 px-6 "
               >
                 {isLoading ? (
                   <Loader2 size={18} className="animate-spin" />
@@ -467,23 +385,23 @@ export default function Home() {
               </Button>
             </div>
 
-            {/* Map container - keeping your existing map code */}
+            {/* Map container */}
             <div
               ref={mapContainerRef}
-              className="w-full h-[300px] rounded-md border border-gray-300"
+              className="w-full h-[300px] rounded-xl border border-surface-200 overflow-hidden"
             ></div>
 
             {/* Location info */}
             {selectedLocation && (
-              <div className="mt-4 flex justify-between items-center">
-                <p className="text-sm text-gray-600">
-                  Selected: {selectedLocation.lat.toFixed(5)},{" "}
+              <div className="mt-4 flex justify-between items-center p-4 bg-surface-100 rounded-lg">
+                <p className="text-sm text-surface-600">
+                  📍 Selected: {selectedLocation.lat.toFixed(5)},{" "}
                   {selectedLocation.lng.toFixed(5)}
                 </p>
                 <Button
                   onClick={() => fetchRestaurants()}
                   disabled={isLoading}
-                  className="bg-green-600 hover:bg-green-700"
+                  className=""
                 >
                   {isLoading ? (
                     <span className="flex items-center">
@@ -501,8 +419,13 @@ export default function Home() {
 
         {/* Error message */}
         {error && (
-          <Alert variant="destructive" className="mb-6">
-            <AlertDescription>{error}</AlertDescription>
+          <Alert
+            variant="destructive"
+            className="border-brand-danger/20 bg-brand-danger/5"
+          >
+            <AlertDescription className="text-brand-danger">
+              {error}
+            </AlertDescription>
           </Alert>
         )}
 
@@ -510,16 +433,90 @@ export default function Home() {
 
         {!isLoading && hasResults && (
           <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <div></div>
-              <SearchFilters onFilterChange={handleFilterChange} />
-            </div>
-            <RestaurantGrid restaurants={restaurants!} filters={filters} />
+            {/* Controls Section */}
+            <Card className="border-0 shadow-sm bg-white/70 backdrop-blur-sm">
+              <CardContent className="p-6">
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                  {/* Left side - Search and Sort */}
+                  <div className="flex flex-col sm:flex-row gap-4 flex-1">
+                    {/* Cuisine Search */}
+                    <div className="flex-1 max-w-sm">
+                      <Input
+                        placeholder="Search by cuisine or restaurant name..."
+                        value={cuisineSearch}
+                        onChange={(e) => setCuisineSearch(e.target.value)}
+                        className="h-10 border-surface-300 focus:border-brand-primary focus:ring-brand-primary/20"
+                      />
+                    </div>
+
+                    {/* Sort Options */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-surface-600 whitespace-nowrap">
+                        Sort by:
+                      </span>
+                      <div className="flex gap-1">
+                        <Button
+                          variant={sortBy === "rating" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setSortBy("rating")}
+                          className={
+                            sortBy === "rating"
+                              ? "bg-brand-primary hover:bg-brand-primary/90"
+                              : "border-surface-300 text-surface-600 hover:bg-surface-100"
+                          }
+                        >
+                          Rating
+                        </Button>
+                        <Button
+                          variant={
+                            sortBy === "delivery_time" ? "default" : "outline"
+                          }
+                          size="sm"
+                          onClick={() => setSortBy("delivery_time")}
+                          className={
+                            sortBy === "delivery_time"
+                              ? "bg-brand-primary hover:bg-brand-primary/90"
+                              : "border-surface-300 text-surface-600 hover:bg-surface-100"
+                          }
+                        >
+                          Delivery Time
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right side - Surprise Me Button */}
+                  <Button
+                    onClick={handleSurpriseMe}
+                    disabled={surpriseLoading}
+                    className="bg-gradient-to-r from-brand-accent to-brand-secondary hover:from-brand-accent/90 hover:to-brand-secondary/90 shadow-lg"
+                  >
+                    <Sparkles size={16} className="mr-2" />
+                    Surprise Me!
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <RestaurantGrid
+              restaurants={restaurants!}
+              filters={{ ...filters, sortBy }}
+              cuisineSearch={cuisineSearch}
+            />
           </div>
         )}
 
         {!isLoading && !hasResults && restaurants && <EmptyState />}
       </main>
+
+      <SurpriseModal
+        isOpen={showSurpriseModal}
+        onClose={handleCloseSurpriseModal}
+        restaurant={surpriseRestaurant}
+        onRefresh={handleRefreshSurprise}
+        isLoading={surpriseLoading}
+        previousCount={previousSuggestions.length}
+      />
     </div>
   );
 }

@@ -48,3 +48,12 @@ export interface DatasetStats {
   platform_breakdown: Record<string, number>;
   last_updated: string;
 }
+
+export interface SurpriseModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  restaurant: Restaurant | null;
+  onRefresh: () => void;
+  isLoading: boolean;
+  previousCount?: number;
+}
