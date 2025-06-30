@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Restaurant, ScrapeResults, SearchFiltersType } from "@/types";
 import { X, BarChart3 } from "lucide-react";
+import { calculateBayesianRating } from "@/lib/calculateBayesianRating";
 
 interface RestaurantGridProps {
   restaurants: ScrapeResults;
@@ -28,6 +29,7 @@ export function RestaurantGrid({ restaurants, filters }: RestaurantGridProps) {
   const [sortBy, setSortBy] = useState<"rating" | "name" | "delivery_time">(
     "rating"
   );
+  const [useBayesianRating, setUseBayesianRating] = useState(true);
 
   const allRestaurants = [
     ...(restaurants.foodpanda || []),
@@ -65,8 +67,14 @@ export function RestaurantGrid({ restaurants, filters }: RestaurantGridProps) {
     return [...restaurants].sort((a, b) => {
       switch (sortBy) {
         case "rating":
-          const ratingA = parseFloat(a.rating.match(/(\d+\.?\d*)/)?.[1] || "0");
-          const ratingB = parseFloat(b.rating.match(/(\d+\.?\d*)/)?.[1] || "0");
+          const ratingA = calculateBayesianRating(
+            a.rating,
+            "all"
+          ).adjustedRating;
+          const ratingB = calculateBayesianRating(
+            b.rating,
+            "all"
+          ).adjustedRating;
           return ratingB - ratingA;
         case "name":
           return a.name.localeCompare(b.name);
@@ -86,6 +94,16 @@ export function RestaurantGrid({ restaurants, filters }: RestaurantGridProps) {
 
   return (
     <div className="space-y-6">
+      {/* <div className="flex items-center gap-4">
+        <div className="flex items-center space-x-2">
+          <Switch
+            id="bayesian-rating"
+            checked={useBayesianRating}
+            onCheckedChange={setUseBayesianRating}
+          />
+          <Label htmlFor="bayesian-rating">Use Bayesian Rating</Label>
+        </div>
+      </div> */}
       {/* Results Summary */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -223,6 +241,7 @@ export function RestaurantGrid({ restaurants, filters }: RestaurantGridProps) {
                 onCompare={handleCompare}
                 showCompareButton={compareList.length < 3}
                 isInCompareList={isRestaurantInCompareList(restaurant)}
+                useBayesianRating={useBayesianRating}
               />
             ))}
           </div>
@@ -238,6 +257,7 @@ export function RestaurantGrid({ restaurants, filters }: RestaurantGridProps) {
                   onCompare={handleCompare}
                   showCompareButton={compareList.length < 3}
                   isInCompareList={isRestaurantInCompareList(restaurant)}
+                  useBayesianRating={useBayesianRating}
                 />
               )
             )}
@@ -254,6 +274,7 @@ export function RestaurantGrid({ restaurants, filters }: RestaurantGridProps) {
                   onCompare={handleCompare}
                   showCompareButton={compareList.length < 3}
                   isInCompareList={isRestaurantInCompareList(restaurant)}
+                  useBayesianRating={useBayesianRating}
                 />
               )
             )}

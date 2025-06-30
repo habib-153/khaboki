@@ -13,12 +13,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardFooter, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Restaurant } from "@/types";
+import { calculateBayesianRating } from "@/lib/calculateBayesianRating";
 
 interface RestaurantCardProps {
   restaurant: Restaurant;
   onCompare?: (restaurant: Restaurant) => void;
   showCompareButton?: boolean;
   isInCompareList?: boolean;
+  useBayesianRating?: boolean; 
 }
 
 export function RestaurantCard({
@@ -26,6 +28,7 @@ export function RestaurantCard({
   onCompare,
   showCompareButton = false,
   isInCompareList = false,
+  useBayesianRating = false,
 }: RestaurantCardProps) {
   const formatRating = (rating: string) => {
     if (rating === "No rating") return "No rating";
@@ -55,13 +58,30 @@ export function RestaurantCard({
     }
   };
 
-  const getRatingColor = (rating: string) => {
-    const numRating = parseFloat(rating.match(/(\d+\.?\d*)/)?.[1] || "0");
-    if (numRating >= 4.5) return "text-green-600 bg-green-50";
-    if (numRating >= 4.0) return "text-blue-600 bg-blue-50";
-    if (numRating >= 3.5) return "text-yellow-600 bg-yellow-50";
-    return "text-red-600 bg-red-50";
-  };
+  const bayesianData = calculateBayesianRating(
+        restaurant.rating,
+        restaurant.platform.toLowerCase()
+      )
+    
+  const displayRating =
+    useBayesianRating && bayesianData
+      ? `${bayesianData.adjustedRating} ★ (Adj.)`
+      : formatRating(restaurant.rating);
+
+      const getRatingColor = (rating: string) => {
+        const ratingToUse =
+          useBayesianRating && bayesianData
+            ? bayesianData.adjustedRating.toString()
+            : rating;
+
+        const numRating = parseFloat(
+          ratingToUse.match(/(\d+\.?\d*)/)?.[1] || "0"
+        );
+        if (numRating >= 4.5) return "text-green-600 bg-green-50";
+        if (numRating >= 4.0) return "text-blue-600 bg-blue-50";
+        if (numRating >= 3.5) return "text-yellow-600 bg-yellow-50";
+        return "text-red-600 bg-red-50";
+      };
 
   return (
     <Card
@@ -163,8 +183,25 @@ export function RestaurantCard({
         {/* Rating Badge */}
         <div className="flex items-center gap-2">
           <Badge className={`${getRatingColor(restaurant.rating)} border-none`}>
-            {formatRating(restaurant.rating)}
+            {displayRating}
           </Badge>
+
+          {/* Show confidence indicator for Bayesian ratings */}
+          {useBayesianRating && bayesianData && (
+            <Badge
+              variant="outline"
+              className={`text-xs ${
+                bayesianData.confidence === "high"
+                  ? "border-green-500 text-green-700"
+                  : bayesianData.confidence === "medium"
+                  ? "border-yellow-500 text-yellow-700"
+                  : "border-red-500 text-red-700"
+              }`}
+            >
+              {bayesianData.confidence}
+            </Badge>
+          )}
+
           <span className="text-xs text-gray-500">
             {formatDeliveryTime(restaurant.delivery_time)}
           </span>

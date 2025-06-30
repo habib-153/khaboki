@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Restaurant } from "@/types";
+import { calculateBayesianRating } from "@/lib/calculateBayesianRating";
 
 interface RestaurantComparisonProps {
   restaurants: Restaurant[];
@@ -26,11 +27,26 @@ export function RestaurantComparison({
   restaurants,
   onRemove,
 }: RestaurantComparisonProps) {
-  const formatRating = (rating: string) => {
+  const formatRating = (
+    rating: string,
+    platform = "all"
+  ) => {
     if (rating === "No rating") return { value: 0, display: "No rating" };
-    const match = rating.match(/(\d+\.?\d*)/);
-    const numValue = match ? parseFloat(match[1]) : 0;
-    return { value: numValue, display: match ? `${match[1]} ★` : rating };
+
+    
+      const bayesianData = calculateBayesianRating(
+        rating,
+        platform.toLowerCase()
+      );
+      return {
+        value: bayesianData.adjustedRating,
+        display: `${bayesianData.adjustedRating} ★ (Adj.)`,
+        confidence: bayesianData.confidence,
+        originalValue: parseFloat(rating.match(/(\d+\.?\d*)/)?.[1] || "0"),
+        originalDisplay: rating.match(/(\d+\.?\d*)/)
+          ? `${rating.match(/(\d+\.?\d*)/)?.[1]} ★`
+          : rating,
+      };
   };
 
   const formatDeliveryTime = (time: string) => {
@@ -64,7 +80,9 @@ export function RestaurantComparison({
   };
 
   // Find best values for highlighting
-  const ratings = restaurants.map((r) => formatRating(r.rating).value);
+  const ratings = restaurants.map(
+    (r) => formatRating(r.rating, r.platform).value
+  );
   const deliveryTimes = restaurants.map(
     (r) => formatDeliveryTime(r.delivery_time).value
   );
@@ -82,12 +100,19 @@ export function RestaurantComparison({
     values,
     bestValue,
     isBetterWhenHigher = false,
+    showConfidence = false,
   }: {
     icon: any;
     label: string;
-    values: { value: number; display: string }[];
+    values: {
+      value: number;
+      display: string;
+      confidence?: string;
+      originalDisplay?: string;
+    }[];
     bestValue: number;
     isBetterWhenHigher?: boolean;
+    showConfidence?: boolean;
   }) => (
     <div className="space-y-2">
       <div className="flex items-center gap-2 text-sm font-medium text-gray-600">
@@ -113,7 +138,30 @@ export function RestaurantComparison({
               }`}
             >
               {isBest && <Award size={12} className="inline mr-1" />}
-              {value.display}
+              <div>{value.display}</div>
+
+              {/* Show original rating if using Bayesian */}
+              {/* {showConfidence && value.originalDisplay && (
+                <div className="text-xs text-gray-500 mt-1">
+                  Original: {value.originalDisplay}
+                </div>
+              )} */}
+
+              {/* Show confidence indicator */}
+              {showConfidence && value.confidence && (
+                <Badge
+                  variant="outline"
+                  className={`text-xs mt-1 ${
+                    value.confidence === "high"
+                      ? "border-green-500 text-green-700"
+                      : value.confidence === "medium"
+                      ? "border-yellow-500 text-yellow-700"
+                      : "border-red-500 text-red-700"
+                  }`}
+                >
+                  {value.confidence}
+                </Badge>
+              )}
             </div>
           );
         })}
@@ -192,10 +240,11 @@ export function RestaurantComparison({
 
         <ComparisonMetric
           icon={Star}
-          label="Rating"
-          values={restaurants.map((r) => formatRating(r.rating))}
+          label={"Rating (Bayesian Adjusted)"}
+          values={restaurants.map((r) => formatRating(r.rating, r.platform))}
           bestValue={bestRating}
           isBetterWhenHigher={true}
+          showConfidence={true}
         />
 
         <ComparisonMetric
@@ -247,10 +296,16 @@ export function RestaurantComparison({
                 Best rated:{" "}
                 {
                   restaurants.find(
-                    (r) => formatRating(r.rating).value === bestRating
+                    (r) =>
+                      formatRating(r.rating,  r.platform)
+                        .value === bestRating
                   )?.name
                 }
                 ({bestRating} ★)
+                
+                  <span className="text-xs text-gray-500 ml-1">
+                    (Bayesian adjusted)
+                  </span>
               </span>
             </div>
           )}
