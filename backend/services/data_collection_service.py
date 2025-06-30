@@ -19,43 +19,36 @@ class DatasetBuilder:
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
 
         with sqlite3.connect(self.db_path) as conn:
-            # Drop old table if exists and create new improved structure
-            conn.execute('DROP TABLE IF EXISTS restaurants')
+            # Check if table exists before dropping
+            table_exists = conn.execute('''
+                SELECT name FROM sqlite_master WHERE type='table' AND name='restaurants'
+            ''').fetchone()
 
-            conn.execute('''
-                CREATE TABLE restaurants (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name TEXT NOT NULL,
-                    cuisine_type TEXT,
-                    image_url TEXT,
-                    url TEXT,
-                    platform TEXT NOT NULL,
-                    rating TEXT,
-                    restaurant_lat REAL,
-                    restaurant_lng REAL,
-                    delivery_time TEXT,
-                    delivery_fee TEXT,
-                    service_area_lat REAL,
-                    service_area_lng REAL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE(name, platform, service_area_lat, service_area_lng)
-                )
-            ''')
-
-            # Create indexes for better performance
-            conn.execute(
-                'CREATE INDEX IF NOT EXISTS idx_platform ON restaurants(platform)')
-            conn.execute(
-                'CREATE INDEX IF NOT EXISTS idx_service_area ON restaurants(service_area_lat, service_area_lng)')
-            conn.execute(
-                'CREATE INDEX IF NOT EXISTS idx_restaurant_location ON restaurants(restaurant_lat, restaurant_lng)')
-            conn.execute(
-                'CREATE INDEX IF NOT EXISTS idx_name ON restaurants(name)')
-            conn.execute(
-                'CREATE INDEX IF NOT EXISTS idx_cuisine ON restaurants(cuisine_type)')
-
-            print("[DATASET] Database initialized with improved structure")
+            if not table_exists:
+                # Only create table if it doesn't exist
+                conn.execute('''
+                    CREATE TABLE restaurants (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name TEXT NOT NULL,
+                        cuisine_type TEXT,
+                        image_url TEXT,
+                        url TEXT,
+                        platform TEXT NOT NULL,
+                        rating TEXT,
+                        restaurant_lat REAL,
+                        restaurant_lng REAL,
+                        delivery_time TEXT,
+                        delivery_fee TEXT,
+                        service_area_lat REAL,
+                        service_area_lng REAL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE(name, platform, service_area_lat, service_area_lng)
+                    )
+                ''')
+                print("[DATASET] Created new restaurants table")
+            else:
+                print("[DATASET] Using existing restaurants table")
 
     def add_scraped_data(self, data: Dict[str, Any], lat: float, lng: float):
         """Add scraped data to processing queue (non-blocking)"""

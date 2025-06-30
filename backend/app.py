@@ -954,7 +954,8 @@ def scrape():
                     }
                 ]
             },
-            "success": True
+            "success": True,
+            # "re": results
         }
 
         # Add to dataset in background (non-blocking)
