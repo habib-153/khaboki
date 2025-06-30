@@ -17,6 +17,7 @@ import { RestaurantCache } from "@/lib/RestaurantCache";
 import { EmptyState, LoadingState } from "@/components/Loading";
 import { RestaurantGrid } from "@/components/RestaurantGrid";
 import { LocationCoordinates, ScrapeResults, SearchFiltersType, Restaurant } from "@/types";
+import { DatasetManager } from "@/components/DatasetManager";
 
 export default function Home() {
   const [searchValue, setSearchValue] = useState<string>("");
@@ -227,16 +228,16 @@ export default function Home() {
         headers: {
           "Content-Type": "application/json",
         },
-        // body: JSON.stringify({
-        //   lat: "23.8103",
-        //   lng: "90.4125",
-        //   text: "Matikata",
-        // }),
         body: JSON.stringify({
-          lat: currentLocation.lat,
-          lng: currentLocation.lng,
-          text: currentSearchText,
+          lat: 23.8103,
+          lng: 90.4125,
+          text: "Matikata",
         }),
+        // body: JSON.stringify({
+        //   lat: currentLocation.lat,
+        //   lng: currentLocation.lng,
+        //   text: currentSearchText,
+        // }),
       });
 
       const data = await response.json();
@@ -411,6 +412,7 @@ export default function Home() {
                 </Button>
               </div>
             )}
+            <DatasetManager />
           </div>
         </div>
       </header>

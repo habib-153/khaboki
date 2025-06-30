@@ -42,3 +42,9 @@ export interface ApiResponse {
   results?: ScrapeResults;
   error?: string;
 }
+
+export interface DatasetStats {
+  total_restaurants: number;
+  platform_breakdown: Record<string, number>;
+  last_updated: string;
+}

@@ -8,7 +8,6 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import os
-
 from .BaseScraper import BaseScraper  
 from models.Restaurant import Restaurant
 
@@ -23,6 +22,7 @@ class FoodPandaScraper(BaseScraper):
 
         try:
             options = webdriver.ChromeOptions()
+            # options.add_argument("--headless")  
             options.add_argument("--disable-blink-features=AutomationControlled")
             options.add_argument("--user-agent=Mozilla/5.0...")
             options.add_experimental_option("excludeSwitches", ["enable-automation"])
@@ -134,47 +134,201 @@ class FoodPandaScraper(BaseScraper):
 
                     # Rating and review count
                     try:
+                        import re
                         # Get the rating
                         rating_elem = restaurant_elem.select_one('[class*="bds-c-rating__label-primary"]')
                         rating = rating_elem.text.strip() if rating_elem else "0"
                         
                         # Get the number of reviews
-                        reviews_elem = restaurant_elem.select_one('[class*="bds-c-rating__label-secondary"]')
+                        reviews_count = "0"
+
+                        reviews_elem = restaurant_elem.select_one(
+                            '[class*="bds-c-rating__label-secondary"]')
                         if reviews_elem and reviews_elem.text:
-                            # Extract just the number from inside the parentheses, like (12)
-                            import re
-                            reviews_match = re.search(r'\((\d+)\)', reviews_elem.text)
-                            reviews_count = reviews_match.group(1) if reviews_match else "0"
-                        else:
-                            reviews_count = "0"
+                            reviews_text = reviews_elem.text.strip()
+                            print(f"[DEBUG] Found reviews element text: '{reviews_text}'")
+
+                            # Extract number from parentheses like "(500+)" or "(50)"
+                            reviews_match = re.search(r'\((\d+\+?)\)', reviews_text)
+                            if reviews_match:
+                                reviews_count = reviews_match.group(1)
+                                print(f"[DEBUG] Extracted reviews count: {reviews_count}")
                             
                         # Format the rating with reviews count
-                        if rating != "0" and reviews_count != "0":
-                            rating = f"{rating}({reviews_count})"
-                        elif rating != "0":
-                            rating = f"{rating}(0)"
+                        if rating and rating != "0":
+                            if reviews_count and reviews_count != "0":
+                                final_rating = f"{rating}({reviews_count})"
+                            else:
+                                final_rating = rating
                         else:
-                            rating = "No rating"
-                            
-                        print(f"[DEBUG] Extracted rating: {rating}")
+                            final_rating = "No rating"
+
+                        print(f"[DEBUG] Final rating: {final_rating}")
                     except Exception as e:
                         print(f"[DEBUG] Error extracting rating: {str(e)}")
                         rating = "No rating"
 
+
                     # Additional details
-                    info_spans = restaurant_elem.find_all(['span', 'div'], class_=['info', 'details'])
                     cuisine_type = "Not specified"
                     delivery_time = "Unknown"
                     delivery_fee = "Unknown"
 
-                    for span in info_spans:
-                        text = span.text.strip()
-                        if any(cuisine in text.lower() for cuisine in ['cuisine', 'food type']):
-                            cuisine_type = text
-                        elif any(time in text.lower() for time in ['min', 'delivery time']):
-                            delivery_time = text
-                        elif any(fee in text.lower() for fee in ['tk', 'fee', 'delivery']):
-                            delivery_fee = text
+                    try:
+                            vendor_info_elements = restaurant_elem.find_all(
+                                "div", class_=lambda x: x and "vendor-info-row" in x)
+
+                            if not vendor_info_elements:
+                                vendor_info_elements = restaurant_elem.find_all(
+                                    "div", class_="vendor-info-row")
+
+                            print(
+                                f"[DEBUG] Found {len(vendor_info_elements)} vendor-info-row elements")
+
+                            import re
+                            for info_elem in vendor_info_elements:
+                                # Get all child elements to process individually
+                                child_elements = info_elem.find_all(
+                                    ['span', 'div'], recursive=True)
+
+                                for child in child_elements:
+                                    child_text = child.get_text(strip=True)
+
+                                    # Skip empty or very short text
+                                    if not child_text or len(child_text) < 2:
+                                        continue
+
+                                    print(
+                                        f"[DEBUG] Processing child text: '{child_text}'")
+
+                                    if any(keyword in child_text.lower() for keyword in ['min']) and delivery_time == "Unknown":
+                                        time_match = re.search(
+                                            r'(\d+(?:-\d+)?\s*min)', child_text, re.IGNORECASE)
+                                        if time_match:
+                                            delivery_time = time_match.group(1)
+                                            print(
+                                                f"[DEBUG] Extracted delivery time: {delivery_time}")
+
+                                    elif any(keyword in child_text for keyword in ['Tk', '৳']) and delivery_fee == "Unknown":
+                                        fee_match = re.search(
+                                            r'((?:Tk|৳)\s*\d+)', child_text)
+                                        if fee_match:
+                                            delivery_fee = fee_match.group(1)
+                                            print(
+                                                f"[DEBUG] Extracted delivery fee: {delivery_fee}")
+
+                                    elif any(keyword in child_text for keyword in ['Cuisines', 'cuisine']) and cuisine_type == "Not specified":
+                                        # Extract cuisine type from text
+                                        if 'Cuisines' in child_text or 'cuisine' in child_text:
+                                            # Remove the keyword part and strip whitespace
+                                            cuisine_type = child_text.replace(
+                                                'Cuisines', '').replace('cuisine', '').strip()
+                                            print(
+                                                f"[DEBUG] Extracted cuisine type: {cuisine_type}")
+
+                            # Method 2: If vendor-info-row didn't work, try span elements with sr-only class
+                            # if delivery_time == "Unknown" or delivery_fee == "Unknown":
+                            #     sr_only_spans = restaurant_elem.find_all(
+                            #         "span", class_="sr-only")
+
+                            #     for span in sr_only_spans:
+                            #         span_text = span.get_text(strip=True)
+                            #         print(f"[DEBUG] SR-only span: '{span_text}'")
+
+                            #         # Look for delivery time label
+                            #         if "delivery time" in span_text.lower() and delivery_time == "Unknown":
+                            #             # Look for the sibling or parent element that contains the actual time
+                            #             next_sibling = span.next_sibling
+                            #             if next_sibling and hasattr(next_sibling, 'get_text'):
+                            #                 sibling_text = next_sibling.get_text(
+                            #                     strip=True)
+                            #                 if any(t in sibling_text.lower() for t in ['min']):
+                            #                     delivery_time = sibling_text
+                            #                     print(
+                            #                         f"[DEBUG] Found delivery time from sibling: {delivery_time}")
+
+                            #             # Also try parent element
+                            #             if delivery_time == "Unknown" and span.parent:
+                            #                 import re
+                            #                 parent_text = span.parent.get_text(
+                            #                     strip=True)
+                            #                 time_match = re.search(
+                            #                     r'(\d+(?:-\d+)?\s*min)', parent_text, re.IGNORECASE)
+                            #                 if time_match:
+                            #                     delivery_time = time_match.group(1)
+                            #                     print(
+                            #                         f"[DEBUG] Found delivery time from parent: {delivery_time}")
+
+                                    # Look for delivery fee label
+                            #         elif "delivery fee" in span_text.lower() and delivery_fee == "Unknown":
+                            #             # Look for the sibling or parent element that contains the actual fee
+                            #             next_sibling = span.next_sibling
+                            #             if next_sibling and hasattr(next_sibling, 'get_text'):
+                            #                 sibling_text = next_sibling.get_text(
+                            #                     strip=True)
+                            #                 if any(f in sibling_text for f in ['Tk', '৳']):
+                            #                     delivery_fee = sibling_text
+                            #                     print(
+                            #                         f"[DEBUG] Found delivery fee from sibling: {delivery_fee}")
+
+                            #             # Also try parent element
+                            #             if delivery_fee == "Unknown" and span.parent:
+                            #                 parent_text = span.parent.get_text(
+                            #                     strip=True)
+                            #                 import re
+                            #                 fee_match = re.search(
+                            #                     r'((?:Tk|৳)\s*\d+)', parent_text)
+                            #                 if fee_match:
+                            #                     delivery_fee = fee_match.group(1)
+                            #                     print(
+                            #                         f"[DEBUG] Found delivery fee from parent: {delivery_fee}")
+
+                            # # Method 3: Final fallback using regex on entire restaurant text
+                            # if delivery_time == "Unknown" or delivery_fee == "Unknown":
+                            #     all_text = restaurant_elem.get_text()
+                            #     import re
+
+                            #     # Extract delivery time with more specific pattern
+                            #     if delivery_time == "Unknown":
+                            #         time_patterns = [
+                            #             r'(\d+\s*-\s*\d+\s*min)',
+                            #             r'(\d+\s*min)',           # "40 min"
+                            #         ]
+
+                            #         for pattern in time_patterns:
+                            #             time_match = re.search(
+                            #                 pattern, all_text, re.IGNORECASE)
+                            #             if time_match:
+                            #                 delivery_time = time_match.group(1).replace(
+                            #                     ' ', '')  # Remove extra spaces
+                            #                 print(
+                            #                     f"[DEBUG] Found delivery time via regex: {delivery_time}")
+                            #                 break
+
+                            #     # Extract delivery fee with more specific pattern
+                            #     if delivery_fee == "Unknown":
+                            #         fee_patterns = [
+                            #             r'(Tk\s*\d+)', 
+                            #             r'(৳\s*\d+)',  
+                            #         ]
+
+                            #         for pattern in fee_patterns:
+                            #             fee_match = re.search(pattern, all_text)
+                            #             if fee_match:
+                            #                 delivery_fee = fee_match.group(1).replace(
+                            #                     ' ', '') 
+                            #                 print(
+                            #                     f"[DEBUG] Found delivery fee via regex: {delivery_fee}")
+                            #                 break
+
+                            print(
+                                f"[DEBUG] Final extracted - Time: '{delivery_time}', Fee: '{delivery_fee}', Cuisine: '{cuisine_type}'")
+
+                    except Exception as e:
+                            print(
+                                f"[DEBUG] Error extracting vendor info: {str(e)}")
+                            import traceback
+                            traceback.print_exc()
 
                     # Image
                     try:
@@ -206,7 +360,7 @@ class FoodPandaScraper(BaseScraper):
                     restaurant = Restaurant(
                         name=name,
                         cuisine_type=cuisine_type,
-                        rating=rating,
+                        rating=final_rating,
                         delivery_time=delivery_time,
                         delivery_fee=delivery_fee,
                         platform="FoodPanda",

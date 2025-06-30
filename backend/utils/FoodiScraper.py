@@ -8,7 +8,7 @@ from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from webdriver_manager.chrome import ChromeDriverManager
 import time
 import requests
-
+import re
 from .BaseScraper import BaseScraper
 from models.Restaurant import Restaurant
 
@@ -26,6 +26,7 @@ class FoodiScraper(BaseScraper):
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--disable-gpu")
         chrome_options.add_argument("--window-size=1600,980")
+        # chrome_options.add_argument("headless")  
 
         service = Service(ChromeDriverManager().install())
         driver = webdriver.Chrome(service=service, options=chrome_options)
@@ -332,55 +333,161 @@ class FoodiScraper(BaseScraper):
                         pass
 
                     # Extract rating - look for rating elements
-                    rating = "No rating"
                     try:
-                        # Look for rating in various possible structures
-                        rating_selectors = [
-                            ".//div[contains(@class, 'p-rating')]//span",
-                            ".//span[contains(text(), '.') and string-length(text()) < 5]",
-                            ".//*[contains(@class, 'rating')]",
-                            ".//div[contains(@class, 'flex')]//span[contains(text(), '.')]"
-                        ]
-
-                        for rating_selector in rating_selectors:
+                        rating = "No rating"
+                        reviews_count = ""
+                        try:
+                            rating_containers = element.find_elements(
+                                By.XPATH, 
+                                ".//div[@class='flex align-items-center column-gap-1' or contains(@class, 'flex align-items-center column-gap-1')]"
+                            )
+                            
+                            if rating_containers:
+                                rating_div = rating_containers[0]
+                                
+                                rating_spans = rating_div.find_elements(By.TAG_NAME, "span")
+                                
+                                if len(rating_spans) >= 1:
+                                    # First span should be the rating value (4.2)
+                                    rating = rating_spans[0].text.strip()
+                                    print(f"[DEBUG] Found rating in first span: {rating}")
+                                
+                                if len(rating_spans) >= 2:
+                                    # Second span should be the reviews count in parentheses
+                                    reviews_text = rating_spans[1].text.strip()
+                                    print(f"[DEBUG] Found reviews text: {reviews_text}")
+                                    
+                                    # Extract the number from parentheses
+                                    if '(' in reviews_text and ')' in reviews_text:
+                                        reviews_count = reviews_text.strip('()')
+                                        print(f"[DEBUG] Extracted review count: {reviews_count}")
+                                    else:
+                                        # Direct number extraction if no parentheses
+                                        digit_match = re.search(r'\d+', reviews_text)
+                                        if digit_match:
+                                            reviews_count = digit_match.group(0)
+                                
+                                # Debug the found spans
+                                print(f"[DEBUG] Found {len(rating_spans)} spans in rating container")
+                                for i, span in enumerate(rating_spans):
+                                    print(f"[DEBUG] Span {i+1} text: '{span.text}'")
+                        
+                        except Exception as precise_error:
+                            print(f"[DEBUG] Error in precise rating extraction: {precise_error}")
+                            
+                            # Fall back to direct XPath for the specific elements we see in screenshots
                             try:
-                                rating_elem = element.find_element(
-                                    By.XPATH, rating_selector)
-                                rating_text = rating_elem.text.strip()
-                                if rating_text and ('.' in rating_text or '★' in rating_text):
-                                    # Check if it looks like a rating (number with decimal)
-                                    import re
-                                    rating_match = re.search(r'(\d+\.?\d*)', rating_text)
-                                    if rating_match:
-                                        rating_num = float(rating_match.group(1))
-                                        if 0 <= rating_num <= 5:  # Valid rating range
-                                            rating = f"{rating_num} ★"
-                                            break
-                            except:
-                                continue
-                    except:
-                        pass
+                                # Try direct XPath for rating (first span with font-semibold)
+                                rating_elem = element.find_element(By.XPATH, ".//span[contains(@class, 'font-semibold')]")
+                                if rating_elem:
+                                    rating = rating_elem.text.strip()
+                                    
+                                # Direct XPath for reviews count (span following font-semibold span)
+                                reviews_elem = element.find_element(By.XPATH, ".//span[contains(@class, 'font-semibold')]/following-sibling::span[1]")
+                                if reviews_elem:
+                                    reviews_text = reviews_elem.text.strip()
+                                    if '(' in reviews_text and ')' in reviews_text:
+                                        reviews_count = reviews_text.strip('()')
+                            
+                            except Exception as xpath_error:
+                                print(f"[DEBUG] Error in direct XPath approach: {xpath_error}")
+                        
+                        # Format the final rating
+                        if rating and rating != "No rating":
+                            if reviews_count:
+                                final_rating = f"{rating}({reviews_count})"
+                            else:
+                                final_rating = rating
+                        else:
+                            final_rating = "No rating"
+                            
+                        print(f"[DEBUG] Enhanced final rating: {final_rating}")
+                        
+                    except Exception as general_error:
+                        print(f"[DEBUG] General error in enhanced rating extraction: {general_error}")
+                        final_rating = "No rating"
 
-                    # Extract delivery time - look for min text
                     delivery_time = "Unknown"
                     try:
-                        # Look for delivery time in various structures
-                        time_elem = element.find_element(
-                            By.XPATH, ".//*[contains(text(), 'min')]")
-                        time_text = time_elem.text.strip()
-                        if 'min' in time_text.lower():
-                            # Extract just the time part
-                            import re
-                            time_match = re.search(
-                                r'(\d+)\s*min', time_text, re.IGNORECASE)
-                            if time_match:
-                                delivery_time = f"{time_match.group(1)} min"
-                            else:
-                                delivery_time = time_text
-                    except:
-                        pass
+                        time_xpaths = [
+                            ".//div[1]/div[3]/div/span",
+                            ".//div/div[1]/div[3]/div/span",
+                            ".//div[contains(@class, 'div-3')]//span",
+                            ".//*[contains(text(), 'min')]",
+                            ".//span[contains(text(), 'min')]",
+                            ".//div[contains(text(), 'min')]//span",
+                            ".//span[contains(text(), '-') and contains(text(), 'min')]",
+                            ".//span[text()[contains(., 'min')]]"
+                        ]
+                        
+                        for xpath in time_xpaths:
+                            try:
+                                time_elements = element.find_elements(By.XPATH, xpath)
+                                for time_elem in time_elements:
+                                    time_text = time_elem.text.strip()
+                                    print(f"[DEBUG] Found time element text: '{time_text}'")
+                                    
+                                    if time_text and 'min' in time_text.lower():
+                                        time_match = re.search(r'(\d+(?:\s*-\s*\d+)?\s*min)', time_text, re.IGNORECASE)
+                                        if time_match:
+                                            delivery_time = time_match.group(1)
+                                            print(f"[DEBUG] Extracted delivery time: {delivery_time}")
+                                            break
+                                        else:
+                                            delivery_time = time_text
+                                            print(f"[DEBUG] Used full time text: {delivery_time}")
+                                            break
+                                
+                                if delivery_time != "Unknown":
+                                    break
+                                    
+                            except Exception as xpath_error:
+                                print(f"[DEBUG] Error with time xpath {xpath}: {xpath_error}")
+                                continue
+                        
+                        if delivery_time == "Unknown":
+                            try:
+                                all_spans = element.find_elements(By.XPATH, ".//span")
+                                for span in all_spans:
+                                    span_text = span.text.strip()
+                                    if (span_text and 
+                                        'min' in span_text.lower() and 
+                                        len(span_text) < 20 and  
+                                        not any(exclude in span_text.lower() for exclude in ['rating', 'review', 'cuisine', 'restaurant'])):
+                                        
+                                        import re
+                                        time_match = re.search(r'(\d+(?:\s*-\s*\d+)?\s*min)', span_text, re.IGNORECASE)
+                                        if time_match:
+                                            delivery_time = time_match.group(1)
+                                            print(f"[DEBUG] Found delivery time via general search: {delivery_time}")
+                                            break
+                                            
+                            except Exception as general_error:
+                                print(f"[DEBUG] Error in general time search: {general_error}")
+                        
+                        # Final fallback using regex on entire element text
+                        if delivery_time == "Unknown":
+                            try:
+                                element_text = element.text
+                                import re
+                                time_patterns = [
+                                    r'(\d+\s*-\s*\d+\s*min)', 
+                                    r'(\d+\s*min)',           
+                                ]
+                                
+                                for pattern in time_patterns:
+                                    time_match = re.search(pattern, element_text, re.IGNORECASE)
+                                    if time_match:
+                                        delivery_time = time_match.group(1)
+                                        print(f"[DEBUG] Found delivery time via regex fallback: {delivery_time}")
+                                        break
+                                        
+                            except Exception as regex_error:
+                                print(f"[DEBUG] Error in regex time extraction: {regex_error}")
+                        
+                    except Exception as e:
+                        print(f"[DEBUG] Error extracting delivery time: {e}")
 
-                    # Extract delivery fee - look for currency symbols
                     delivery_fee = "Unknown"
                     try:
                         # Look for delivery fee
@@ -388,8 +495,6 @@ class FoodiScraper(BaseScraper):
                             By.XPATH, ".//*[contains(text(), '৳') or contains(text(), 'tk')]")
                         fee_text = fee_elem.text.strip()
                         if '৳' in fee_text or 'tk' in fee_text:
-                            # Extract fee amount
-                            import re
                             fee_match = re.search(r'(?:৳|tk)\s*(\d+)', fee_text)
                             if fee_match:
                                 delivery_fee = f"৳{fee_match.group(1)}"
@@ -399,15 +504,36 @@ class FoodiScraper(BaseScraper):
                         pass
 
                     # Extract cuisine type from text content if possible
-                    cuisine_type = "Not specified"
                     try:
-                        element_text = element.text.lower()
-                        cuisines = ['pizza', 'burger', 'chinese', 'indian', 'bengali',
-                                    'thai', 'italian', 'fast food', 'cafe', 'restaurant']
-                        for cuisine in cuisines:
-                            if cuisine in element_text:
-                                cuisine_type = cuisine.title()
-                                break
+                        cuisine_type = "Not specified"
+                        try:
+                            cuisine_xpath = ".//span[contains(@class, 'text-16') and contains(@class, 'fd-text-gray-700')]"
+                            cuisine_elem = element.find_element(By.XPATH, cuisine_xpath)
+                            if cuisine_elem:
+                                cuisine_text = cuisine_elem.text.strip()
+                                print(f"[DEBUG] Raw cuisine text: '{cuisine_text}'")
+
+                                if cuisine_text and len(cuisine_text) > 1:
+                                    # Method 1: Split by newline - the format is often "৳৳\nSweets"
+                                    cuisine_parts = cuisine_text.strip().split('\n')
+                                    if len(cuisine_parts) > 1:
+                                        # Get the second part which is usually the cuisine type
+                                        cuisine_type = cuisine_parts[-1].strip()
+                                        print(
+                                            f"[DEBUG] Found cuisine type after newline: {cuisine_type}")
+                                    else:
+                                        # Method 2: Remove price indicators (৳) from the text
+                                        clean_text = re.sub(r'[৳₹$€£¥]+', '', cuisine_text).strip()
+
+                                        # If we have text after removing price symbols, use that
+                                        if clean_text:
+                                            cuisine_type = clean_text
+                                            print(
+                                                f"[DEBUG] Found cuisine type after removing price symbols: {cuisine_type}")
+                                        else:
+                                            cuisine_type = cuisine_text.strip()
+                        except Exception as e:
+                            print(f"[DEBUG] Error getting cuisine from specific XPath: {e}")
                     except:
                         pass
 
@@ -477,7 +603,7 @@ class FoodiScraper(BaseScraper):
                     restaurant = Restaurant(
                         name=name,
                         cuisine_type=cuisine_type,
-                        rating=rating,
+                        rating=final_rating,
                         delivery_time=delivery_time,
                         delivery_fee=delivery_fee,
                         platform="Foodi",
@@ -568,279 +694,6 @@ class FoodiScraper(BaseScraper):
 
         finally:
             driver.quit()
-
-            # Look for restaurant cards using more specific XPaths
-        #     restaurant_elements = []
-
-        #     # Try to find restaurant cards using XPath patterns
-        #     restaurant_xpaths = [
-        #         # Based on your provided XPath structure
-        #         "//div[contains(@class, 'col')]//a[contains(@href, '/restaurant/')]",
-        #         # Divs containing h6 (restaurant names)
-        #         "//div[contains(@class, 'col')]//div[.//h6]",
-        #         # Following the structure you mentioned
-        #         "//*[@id='__next']//div[contains(@class, 'col')]//a//div",
-        #         "//a[contains(@href, '/restaurant/')]//div",  # Restaurant links
-        #         "//h6[parent::div]/..",  # Parent divs of h6 elements (restaurant names)
-        #     ]
-
-        #     for xpath in restaurant_xpaths:
-        #         elements = driver.find_elements(By.XPATH, xpath)
-        #         if elements:
-        #             print(f"[DEBUG] Found {len(elements)} elements using XPath: {xpath}")
-        #             # Filter elements that contain meaningful content
-        #             filtered_elements = []
-        #             for elem in elements:
-        #                 try:
-        #                     elem_text = elem.text.strip()
-        #                     # Check if element has substantial content and looks like a restaurant card
-        #                     if (len(elem_text) > 20 and
-        #                         any(keyword in elem_text.lower() for keyword in ['min', 'tk', '৳', 'delivery']) and
-        #                             not any(exclude in elem_text.lower() for exclude in ['temporarily unavailable', 'business account', 'signup'])):
-        #                         filtered_elements.append(elem)
-        #                 except:
-        #                     continue
-
-        #             if filtered_elements:
-        #                 restaurant_elements = filtered_elements
-        #                 print(
-        #                     f"[DEBUG] Using {len(filtered_elements)} filtered restaurant elements")
-        #                 break
-
-        #     # If no specific restaurant cards found, try direct name extraction
-        #     if not restaurant_elements:
-        #         print("[DEBUG] No restaurant cards found, trying direct name extraction...")
-
-        #         name_elements = driver.find_elements(
-        #             By.XPATH, "//h6[contains(@class, '') or not(@class)]")
-
-        #         if name_elements:
-        #             print(
-        #                 f"[DEBUG] Found {len(name_elements)} h6 elements (potential restaurant names)")
-        #             # Get parent containers of these names
-        #             restaurant_elements = []
-        #             for name_elem in name_elements:
-        #                 try:
-        #                     # Get the restaurant card container (go up a few levels)
-        #                     card_container = name_elem.find_element(
-        #                         By.XPATH, "./ancestor::div[contains(@class, 'col') or contains(@class, 'card')]")
-        #                     if card_container and card_container not in restaurant_elements:
-        #                         restaurant_elements.append(card_container)
-        #                 except:
-        #                     continue
-
-        #             print(
-        #                 f"[DEBUG] Found {len(restaurant_elements)} restaurant containers from names")
-
-        #     # Extract restaurant data with better parsing
-        #     restaurants = []
-
-        #     for i, element in enumerate(restaurant_elements[:20]):
-        #         try:
-        #             print(f"[DEBUG] Processing restaurant {i+1}...")
-
-        #             name = "Unknown Restaurant"
-        #             try:
-        #                 name_selectors = [
-        #                     "//*[@id='__next']/div[1]/main/section[2]/form/div/div/div[2]/div[2]/div[2]/div/div/div[1]/div[1]/div/a/div/div[2]/h6",
-        #                 ]
-
-        #                 for selector in name_selectors:
-        #                     name_elem = element.find_element(By.XPATH, selector)
-        #                     if name_elem and name_elem.text.strip():
-        #                         name = name_elem.text.strip()
-        #                         print(f"[DEBUG] Found name: {name}")
-        #                         break
-        #             except:
-        #                 element_text = element.text.strip()
-        #                 lines = element_text.split('\n')
-        #                 for line in lines:
-        #                     line = line.strip()
-        #                     if (line and len(line) > 3 and len(line) < 80 and
-        #                             not any(skip in line.lower() for skip in ['temporarily unavailable', 'open at', 'closed', 'delivery', 'min', 'tk', '৳'])):
-        #                         name = line
-        #                         break
-
-        #             # Skip if name is still generic
-        #             if name in ["Unknown Restaurant", "Temporarily unavailable"]:
-        #                 continue
-
-        #             # Extract rating
-        #             rating = "No rating"
-        #             try:
-        #                 rating_elem = element.find_element(
-        #                     By.XPATH, "//*[@id='__next']/div[1]/main/section[2]/form/div/div/div[2]/div[2]/div[2]/div/div/div[1]/div[1]/div/a/div/div[2]/div/div[1]/div[2]/span[1]")
-        #                 if rating_elem:
-        #                     rating_text = rating_elem.text.strip()
-        #                     if rating_text and ('★' in rating_text or '.' in rating_text):
-        #                         rating = rating_text
-        #             except:
-        #                 # Try regex on full text
-        #                 import re
-        #                 element_text = element.text
-        #                 rating_match = re.search(
-        #                     r'(\d+\.?\d*)\s*(?:★|star)', element_text, re.IGNORECASE)
-        #                 if rating_match:
-        #                     rating = f"{rating_match.group(1)} ★"
-
-        #             # Extract delivery time
-        #             delivery_time = "Unknown"
-        #             try:
-        #                 time_elem = element.find_element(
-        #                     By.XPATH, ".//*[contains(text(), 'min')]")
-        #                 if time_elem:
-        #                     time_text = time_elem.text.strip()
-        #                     if 'min' in time_text.lower():
-        #                         delivery_time = time_text
-        #             except:
-        #                 # Try regex
-        #                 import re
-        #                 element_text = element.text
-        #                 time_match = re.search(r'(\d+)\s*min', element_text, re.IGNORECASE)
-        #                 if time_match:
-        #                     delivery_time = f"{time_match.group(1)} min"
-
-        #             # Extract delivery fee
-        #             delivery_fee = "Unknown"
-        #             try:
-        #                 fee_elem = element.find_element(
-        #                     By.XPATH, ".//*[contains(text(), 'Tk') or contains(text(), '৳')]")
-        #                 if fee_elem:
-        #                     fee_text = fee_elem.text.strip()
-        #                     if '৳' in fee_text or 'Tk' in fee_text:
-        #                         delivery_fee = fee_text
-        #             except:
-        #                 # Try regex
-        #                 import re
-        #                 element_text = element.text
-        #                 fee_match = re.search(r'(?:Tk|৳)\s*(\d+)', element_text)
-        #                 if fee_match:
-        #                     delivery_fee = f"৳{fee_match.group(1)}"
-
-        #             # Extract image URL
-        #             image_url = "https://via.placeholder.com/300x200?text=No+Image"
-        #             try:
-        #                 img_elem = element.find_element(
-        #                     By.XPATH, "//*[@id='__next']/div[1]/main/section[2]/form/div/div/div[2]/div[2]/div[2]/div/div/div[1]/div[1]/div/a/div/div[1]/div[1]/img")
-        #                 src = img_elem.get_attribute("src")
-        #                 if src and "http" in src:
-        #                     image_url = src
-        #             except:
-        #                 pass
-
-        #             # Extract restaurant URL
-        #             url = "https://foodibd.com"
-        #             try:
-        #                 link_elem = element.find_element(
-        #                     By.XPATH, "//*[@id='__next']/div[1]/main/section[2]/form/div/div/div[2]/div[2]/div[2]/div/div/div[1]/div[1]/div/a")
-        #                 href = link_elem.get_attribute("href")
-        #                 if href and href.startswith("http"):
-        #                     url = href
-        #                 else:
-        #                     url = f'https://foodibd.com{href}'
-        #             except:
-        #                 pass
-
-        #             # Create restaurant object
-        #             restaurant = Restaurant(
-        #                 name=name,
-        #                 cuisine_type="Not specified",
-        #                 rating=rating,
-        #                 delivery_time=delivery_time,
-        #                 delivery_fee=delivery_fee,
-        #                 platform="Foodi",
-        #                 image_url=image_url,
-        #                 url=url
-        #             )
-
-        #             restaurants.append(restaurant)
-        #             print(
-        #                 f"[DEBUG] Successfully extracted: {name} | {rating} | {delivery_time}")
-
-        #         except Exception as e:
-        #             print(f"[DEBUG] Error extracting restaurant {i+1}: {e}")
-        #             continue
-
-        #     # If still no restaurants found, try alternative approach with direct XPath
-        #     if not restaurants:
-        #         print("[DEBUG] No restaurants extracted, trying direct XPath approach...")
-
-        #         try:
-        #             # Use the exact XPath pattern you provided
-        #             direct_name_elements = driver.find_elements(
-        #                 By.XPATH, "//*[@id='__next']//h6")
-
-        #             print(f"[DEBUG] Found {len(direct_name_elements)} h6 elements")
-
-        #             for i, name_elem in enumerate(direct_name_elements[:20]):
-        #                 try:
-        #                     name = name_elem.text.strip()
-        #                     if name and len(name) > 3 and "temporarily unavailable" not in name.lower():
-        #                         print(f"[DEBUG] Direct extraction {i+1}: {name}")
-
-        #                         # Try to get the parent container for additional info
-        #                         try:
-        #                             parent_container = name_elem.find_element(
-        #                                 By.XPATH, "./ancestor::div[3]")
-        #                             container_text = parent_container.text
-
-        #                             # Extract additional info from container
-        #                             delivery_time = "Unknown"
-        #                             rating = "No rating"
-
-        #                             import re
-        #                             time_match = re.search(
-        #                                 r'(\d+)\s*min', container_text, re.IGNORECASE)
-        #                             if time_match:
-        #                                 delivery_time = f"{time_match.group(1)} min"
-
-        #                             rating_match = re.search(
-        #                                 r'(\d+\.?\d*)\s*(?:★|star)', container_text, re.IGNORECASE)
-        #                             if rating_match:
-        #                                 rating = f"{rating_match.group(1)} ★"
-
-        #                         except:
-        #                             container_text = name
-        #                             delivery_time = "Unknown"
-        #                             rating = "No rating"
-
-        #                         restaurant = Restaurant(
-        #                             name=name,
-        #                             cuisine_type="Not specified",
-        #                             rating=rating,
-        #                             delivery_time=delivery_time,
-        #                             delivery_fee="Unknown",
-        #                             platform="Foodi",
-        #                             image_url="https://via.placeholder.com/300x200?text=No+Image",
-        #                             url="https://foodibd.com"
-        #                         )
-
-        #                         restaurants.append(restaurant)
-
-        #                 except Exception as e:
-        #                     print(f"[DEBUG] Error in direct extraction {i+1}: {e}")
-        #                     continue
-
-        #         except Exception as e:
-        #             print(f"[DEBUG] Error in direct XPath approach: {e}")
-
-        #     print(
-        #         f"[DEBUG] Successfully extracted {len(restaurants)} restaurants from foodi")
-
-        #     # Keep browser open for debugging
-        #     print("[DEBUG] Keeping browser open for 10 seconds...")
-        #     time.sleep(10)
-
-        #     return restaurants
-
-        # except Exception as e:
-        #     print(f"[DEBUG] Error in foodi scraping: {e}")
-        #     import traceback
-        #     print(traceback.format_exc())
-        #     return []
-
-        # finally:
-        #     driver.quit()
 
     def reverse_geocode_address(self, lat, lng):
         """
