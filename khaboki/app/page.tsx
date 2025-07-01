@@ -40,7 +40,9 @@ export default function Home() {
 
   // Search and filter states
   const [cuisineSearch, setCuisineSearch] = useState<string>("");
-  const [sortBy, setSortBy] = useState<"rating" | "delivery_time">("rating");
+  const [sortBy, setSortBy] = useState<"rating" | "delivery_time" | "offers">(
+    "rating"
+  );
 
   const {
     getSurpriseRestaurant,
@@ -198,8 +200,14 @@ export default function Home() {
   }, []);
 
   const fetchRestaurants = async (forceRefresh = false) => {
-    const currentLocation = selectedLocation || { lat: 23.8103, lng: 90.4125 };
-    const currentSearchText = searchValue || "Matikata";
+    const currentLocation = selectedLocation 
+    const currentSearchText = searchValue 
+console.log(currentLocation, currentSearchText);
+
+    if (!currentLocation) {
+      setError("Please select a location first");
+      return;
+    }
 
     if (!forceRefresh) {
       const cachedData = RestaurantCache.shouldUseCache(
@@ -223,10 +231,15 @@ export default function Home() {
         headers: {
           "Content-Type": "application/json",
         },
+        // body: JSON.stringify({
+        //   lat: 23.8103,
+        //   lng: 90.4125,
+        //   text: "Matikata",
+        // }),
         body: JSON.stringify({
-          lat: 23.8103,
-          lng: 90.4125,
-          text: "Matikata",
+          lat: currentLocation.lat,
+          lng: currentLocation.lng,
+          text: currentSearchText,
         }),
       });
 
@@ -288,7 +301,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-surface-50">
       {/* Modern Header */}
-      <header className="bg-white/80 backdrop-blur-lg border-b border-surface-200 sticky top-0 z-40">
+      <header className="bg-brand-primary/80 backdrop-blur-lg border-b border-surface-200 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between py-4">
             {/* Logo and Title */}
@@ -297,21 +310,17 @@ export default function Home() {
                 <span className="text-white font-bold text-lg">K</span>
               </div>
               <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-brand-primary to-brand-secondary bg-clip-text text-transparent">
-                  Khabo ki?
-                </h1>
-                <p className="text-surface-600  text-sm">
-                  Find your perfect meal
-                </p>
+                <h1 className="text-2xl text-white font-bold ">Khabo ki?</h1>
+                <p className="text-white  text-sm">Find your perfect meal</p>
               </div>
             </div>
 
             {/* Cache Info */}
-            {cacheInfo.hasCache && (
-              <div className="flex items-center gap-3">
+            {/* {cacheInfo.hasCache && (
+              <div className="flex items-center gap-3 text-white">
                 <Badge
                   variant="outline"
-                  className="bg-brand-success/10 text-brand-success border-brand-success/20"
+                  className="bg-brand-success/10 border-brand-success/20"
                 >
                   <div className="w-2 h-2 bg-brand-success rounded-full mr-2"></div>
                   Cached {cacheInfo.age}m ago
@@ -320,12 +329,12 @@ export default function Home() {
                   variant="ghost"
                   size="sm"
                   onClick={clearCache}
-                  className="text-surface-600 hover:text-surface-900"
+                  className=" hover:text-surface-900"
                 >
                   Clear Cache
                 </Button>
               </div>
-            )}
+            )} */}
           </div>
         </div>
       </header>
@@ -337,7 +346,7 @@ export default function Home() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h2 className="text-xl font-semibold text-surface-900">
+                <h2 className="text-xl font-semibold text-brand-primary">
                   Select your location
                 </h2>
                 <p className="text-surface-600 text-sm mt-1">
@@ -481,6 +490,18 @@ export default function Home() {
                         >
                           Delivery Time
                         </Button>
+                        <Button
+                          variant={sortBy === "offers" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setSortBy("offers")}
+                          className={
+                            sortBy === "offers"
+                              ? "bg-brand-primary hover:bg-brand-primary/90"
+                              : "border-surface-300 text-surface-600 hover:bg-surface-100"
+                          }
+                        >
+                          Offers
+                        </Button>
                       </div>
                     </div>
                   </div>
@@ -489,7 +510,7 @@ export default function Home() {
                   <Button
                     onClick={handleSurpriseMe}
                     disabled={surpriseLoading}
-                    className="bg-gradient-to-r from-brand-accent to-brand-secondary hover:from-brand-accent/90 hover:to-brand-secondary/90 shadow-lg"
+                    className="bg-brand-primary shadow-lg"
                   >
                     <Sparkles size={16} className="mr-2" />
                     Surprise Me!

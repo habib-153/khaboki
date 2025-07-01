@@ -958,14 +958,19 @@ def scrape():
             # "re": results
         }
 
+        # response_data = {
+        #     "success": True,
+        #     "results": results
+        # }
+
         # Add to dataset in background (non-blocking)
-        try:
-            lat = float(data.get('lat'))
-            lng = float(data.get('lng'))
-            dataset_builder.add_scraped_data(response_data, lat, lng)
-            print(f"[DATASET] Queued data for processing: {lat}, {lng}")
-        except Exception as dataset_error:
-            print(f"[DATASET] Error queuing data: {dataset_error}")
+        # try:
+        #     lat = float(data.get('lat'))
+        #     lng = float(data.get('lng'))
+        #     dataset_builder.add_scraped_data(response_data, lat, lng)
+        #     print(f"[DATASET] Queued data for processing: {lat}, {lng}")
+        # except Exception as dataset_error:
+        #     print(f"[DATASET] Error queuing data: {dataset_error}")
 
         return jsonify(response_data)
 

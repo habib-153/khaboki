@@ -85,7 +85,7 @@ export function RestaurantCard({
 
   return (
     <Card
-      className={`overflow-hidden hover:shadow-lg transition-all duration-300 group ${
+      className={`overflow-hidden pt-0 hover:shadow-lg transition-all duration-300 group ${
         isInCompareList ? "ring-2 ring-blue-500 shadow-lg" : ""
       }`}
     >
@@ -122,13 +122,13 @@ export function RestaurantCard({
             {restaurant.offers.slice(0, 2).map((offer, index) => (
               <Badge
                 key={index}
-                className="bg-red-500 text-white text-xs font-bold animate-pulse"
+                className={`${getPlatformColor(restaurant.platform)} text-white text-xs font-bold animate-pulse`}
               >
                 {offer}
               </Badge>
             ))}
             {restaurant.offers.length > 2 && (
-              <Badge className="bg-red-600 text-white text-xs">
+              <Badge className={`${getPlatformColor(restaurant.platform)} text-white text-xs`}>
                 +{restaurant.offers.length - 2} more
               </Badge>
             )}
@@ -162,7 +162,7 @@ export function RestaurantCard({
               <Badge
                 key={index}
                 variant="secondary"
-                className="text-xs bg-red-50 text-red-700 border border-red-200"
+                className="text-xs bg-red-50 text-brand-primary border border-red-200"
               >
                 🎉 {offer}
               </Badge>
@@ -174,7 +174,7 @@ export function RestaurantCard({
           <p className="text-sm text-gray-600 capitalize">
             {restaurant.cuisine_type || "Various cuisines"}
           </p>
-          <div className="flex items-center gap-1 text-sm text-green-600 font-medium">
+          <div className="flex items-center gap-1 text-sm text-brand-primary font-medium">
             <DollarSign size={14} />
             <span>{formatDeliveryFee(restaurant.delivery_fee)}</span>
           </div>
@@ -202,7 +202,7 @@ export function RestaurantCard({
             </Badge>
           )}
 
-          <span className="text-xs text-gray-500">
+          <span className="text-sm text-brand-primary font-semibold">
             {formatDeliveryTime(restaurant.delivery_time)}
           </span>
         </div>
@@ -218,10 +218,22 @@ export function RestaurantCard({
         >
           <Button
             variant="outline"
-            className="w-full hover:bg-primary hover:text-primary-foreground transition-colors"
+            className="w-full bg-brand-primary hover:bg-primary text-primary-foreground hover:text-primary-foreground transition-all duration-300 transform hover:scale-105 hover:shadow-lg relative overflow-hidden"
           >
-            <ExternalLink size={16} className="mr-2" />
-            Order Now
+            {/* Animated background effect */}
+            <div className="absolute inset-0 bg-gradient-to-r from-brand-primary via-brand-accent to-brand-primary bg-size-200 bg-pos-0 hover:bg-pos-100 transition-all duration-500 opacity-0 hover:opacity-20"></div>
+
+            {/* Button content */}
+            <div className="relative z-10 flex items-center justify-center">
+              <ExternalLink
+                size={16}
+                className="mr-2 transition-transform duration-300 group-hover:translate-x-1"
+              />
+              <span className="font-medium">Order Now</span>
+            </div>
+
+            {/* Ripple effect */}
+            <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 transform scale-0 group-hover:scale-100 transition-all duration-300 rounded-md"></div>
           </Button>
         </a>
 

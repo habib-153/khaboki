@@ -52,7 +52,7 @@ You are an intelligent restaurant discovery agent. I have provided you with deta
 Name, cuisine types, price range, Average rating and number of reviews per platform, Delivery time and distance from the user's location
 ,Availability status, Any special offers or highlights (e.g., "New on platform", "Top rated", etc.).
 
-Your task is to pick a restaurant that the user is most likely to enjoy but may not have tried yet – this is for a "Surprise Me" button. You must balance quality, novelty, and availability.
+Your task is to pick a restaurant that the user is most likely to enjoy – this is for a "Surprise Me" button. You must balance quality, novelty, and availability.
 
 ${
   excludePrevious

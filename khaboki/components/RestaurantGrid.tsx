@@ -112,6 +112,37 @@ export function RestaurantGrid({
           const timeA = parseInt(a.delivery_time.match(/(\d+)/)?.[1] || "999");
           const timeB = parseInt(b.delivery_time.match(/(\d+)/)?.[1] || "999");
           return timeA - timeB;
+
+        case "offers":
+          // Sort by number of offers (descending), then by offer quality
+          const offersCountA = a.offers?.length || 0;
+          const offersCountB = b.offers?.length || 0;
+
+          if (offersCountA !== offersCountB) {
+            return offersCountB - offersCountA; // More offers first
+          }
+
+          // If same number of offers, sort by discount percentage
+          const getMaxDiscount = (offers: string[] | undefined) => {
+            if (!offers || offers.length === 0) return 0;
+
+            let maxDiscount = 0;
+            offers.forEach((offer) => {
+              const match = offer.match(/(\d+)%/);
+              if (match) {
+                const discount = parseInt(match[1]);
+                if (discount > maxDiscount) {
+                  maxDiscount = discount;
+                }
+              }
+            });
+            return maxDiscount;
+          };
+
+          const maxDiscountA = getMaxDiscount(a.offers);
+          const maxDiscountB = getMaxDiscount(b.offers);
+          return maxDiscountB - maxDiscountA;
+          
         default:
           return 0;
       }
@@ -139,7 +170,7 @@ export function RestaurantGrid({
             {foodpandaCount > 0 && (
               <Badge
                 variant="secondary"
-                className="bg-platform-foodpanda/10 text-platform-foodpanda border-platform-foodpanda/20"
+                className="bg-pink-500 hover:bg-pink-600 text-white border-platform-foodpanda/20"
               >
                 FoodPanda: {foodpandaCount}
               </Badge>
@@ -147,7 +178,7 @@ export function RestaurantGrid({
             {foodiCount > 0 && (
               <Badge
                 variant="secondary"
-                className="bg-platform-foodi/10 text-platform-foodi border-platform-foodi/20"
+                className="bg-red-500 hover:bg-red-600 text-white border-platform-foodi/20"
               >
                 Foodi: {foodiCount}
               </Badge>

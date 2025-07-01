@@ -25,7 +25,7 @@ class FoodiScraper(BaseScraper):
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--disable-gpu")
-        chrome_options.add_argument("--window-size=1600,980")
+        chrome_options.add_argument("--window-size=1200,980")
         # chrome_options.add_argument("headless")  
 
         service = Service(ChromeDriverManager().install())
@@ -88,146 +88,274 @@ class FoodiScraper(BaseScraper):
                 # Clear the modal input and set our location
                 modal_location_input.clear()
                 time.sleep(1)
-                modal_location_input.send_keys(text)
+                modal_location_input.send_keys(location_text)
                 print("[DEBUG] Set location in modal input")
                 time.sleep(3)  # Wait for dropdown suggestions to appear
 
+                
                 # Wait for and select from dropdown suggestions
+                print("[DEBUG] Looking for location dropdown suggestions...")
                 print("[DEBUG] Looking for location dropdown suggestions...")
                 suggestion_selected = False
 
                 try:
-                    location_parts = text.split(',')
-                    primary_location = location_parts[0].strip() if location_parts else text.strip()
+                    import re
+                    location_parts = location_text.split(',')
 
-                    # Try different selectors for suggestions
+                    # Get all location parts and clean them
+                    all_location_parts = []
+                    for part in location_parts:
+                        clean_part = part.strip()
+                        if clean_part:
+                            all_location_parts.append(clean_part)
+                            # Also add cleaned version (remove common words)
+                            cleaned = re.sub(
+                                r'\b(road|rd|street|st|embassy|embasy)\b', '', clean_part, flags=re.IGNORECASE).strip()
+                            if cleaned and cleaned != clean_part:
+                                all_location_parts.append(cleaned)
+
+                    print(
+                        f"[DEBUG] All location parts to search: {all_location_parts}")
+
+                    # Wait for suggestions to appear
+                    time.sleep(5)
+
+                    # Build dynamic selectors based on all location parts
                     suggestion_selectors = [
+                        # Standard autocomplete dropdowns
                         "//div[contains(@class, 'p-autocomplete-items')]//li",
-                        f"//div[contains(text(), '{primary_location}')]",
-                        f"//li[contains(text(), '{primary_location}')]",
-                        f"//*[contains(text(), '{primary_location}') and contains(text(), 'Bangladesh')]",
-                        f"//*[contains(text(), '{primary_location}') and contains(text(), 'Dhaka')]"
+                        "//div[contains(@class, 'p-autocomplete-panel')]//li",
+                        "//ul[contains(@class, 'p-autocomplete-items')]//li",
+
+                        # Generic list items that might contain locations
+                        "//li[contains(text(), 'ঢাকা') or contains(text(), 'Dhaka')]",
+                        "//div[contains(text(), 'ঢাকা') or contains(text(), 'Dhaka')]",
+                        f"//*[contains(text(), {text}) or contains(text(), '{location_text}')]",
+                        # Broader search for any suggestions
+                        # "//*[@role='option']",
+                        # "//div[@role='listbox']//div",
+                        # "//ul[@role='listbox']//li"
                     ]
+
+                    # Add dynamic selectors for each location part
+                    for part in all_location_parts:
+                        if len(part) > 2:  # Only add meaningful parts
+                            # Escape single quotes in the part for XPath
+                            escaped_part = part.replace("'", "\\'")
+                            suggestion_selectors.append(
+                                f"//*[contains(text(), '{escaped_part}')]")
 
                     for selector in suggestion_selectors:
                         try:
-                            suggestions = WebDriverWait(driver, 5).until(
-                                EC.presence_of_all_elements_located((By.XPATH, selector))
+                            print(f"[DEBUG] Trying selector: {selector}")
+                            suggestions = WebDriverWait(driver, 3).until(
+                                EC.presence_of_all_elements_located(
+                                    (By.XPATH, selector))
                             )
 
                             if suggestions:
                                 print(
                                     f"[DEBUG] Found {len(suggestions)} suggestions with selector: {selector}")
 
-                                # Try to find the best suggestion
-                                for i, suggestion in enumerate(suggestions[:5]):
-                                    suggestion_text = suggestion.text.strip()
-                                    print(f"[DEBUG] Suggestion {i+1}: '{suggestion_text}'")
-
-                                    if (primary_location.lower() in suggestion_text.lower() and
-                                        "dhaka" in suggestion_text.lower() and
-                                            len(suggestion_text) > 10):
-
+                                # Log all suggestions for debugging
+                                for i, suggestion in enumerate(suggestions[:10]):
+                                    try:
+                                        suggestion_text = suggestion.text.strip()
                                         print(
-                                            f"[DEBUG] Selecting suggestion: {suggestion_text}")
-                                        # Use JavaScript click to ensure it works
-                                        driver.execute_script(
-                                            "arguments[0].click();", suggestion)
-                                        suggestion_selected = True
-                                        time.sleep(2)
-                                        break
+                                            f"[DEBUG] Suggestion {i+1}: '{suggestion_text}'")
+                                    except:
+                                        print(
+                                            f"[DEBUG] Suggestion {i+1}: Could not get text")
 
-                                # If we found suggestions but no perfect match, select the first one
+                                # Enhanced matching logic using all location parts
+                                for i, suggestion in enumerate(suggestions[:10]):
+                                    try:
+                                        suggestion_text = suggestion.text.strip()
+                                        suggestion_lower = suggestion_text.lower()
+
+                                        # Check how many of our location parts match this suggestion
+                                        part_matches = 0
+                                        matched_parts = []
+
+                                        for part in all_location_parts:
+                                            part_lower = part.lower()
+                                            if part_lower in suggestion_lower:
+                                                part_matches += 1
+                                                matched_parts.append(part)
+                                                print(
+                                                    f"[DEBUG] Matched part: '{part}' in suggestion")
+
+                                        # Check for location indicators
+                                        location_indicators = [
+                                            'ঢাকা', 'dhaka', 'bangladesh', 'বাংলাদেশ', {text},
+                                            '১২১২', '1212'
+                                        ]
+
+                                        indicator_matches = sum(1 for indicator in location_indicators
+                                                                if indicator in suggestion_lower)
+
+                                        # Enhanced matching criteria
+                                        is_good_match = False
+
+                                        # Priority matching logic:
+                                        if part_matches >= 2:
+                                            # If 2 or more parts of our address match
+                                            is_good_match = True
+                                            print(
+                                                f"[DEBUG] Good match - {part_matches} parts matched: {matched_parts}")
+                                        elif part_matches >= 1 and indicator_matches >= 1:
+                                            # If at least 1 part matches and has location indicators
+                                            is_good_match = True
+                                            print(
+                                                f"[DEBUG] Good match - 1 part + indicators: {matched_parts}")
+                                        elif indicator_matches >= 2:
+                                            # If multiple location indicators match
+                                            is_good_match = True
+                                            print(
+                                                f"[DEBUG] Good match - multiple indicators")
+                                        elif (('ঢাকা' in suggestion_lower or 'dhaka' in suggestion_lower) and
+                                              len(suggestion_text) > 15):
+                                            # Fallback for long Dhaka addresses
+                                            is_good_match = True
+                                            print(
+                                                f"[DEBUG] Good match - long Dhaka address")
+                                        elif ('bangladesh' in suggestion_lower or 'বাংলাদেশ' in suggestion_lower):
+                                            # Any Bangladesh address
+                                            is_good_match = True
+                                            print(
+                                                f"[DEBUG] Good match - Bangladesh address")
+
+                                        if is_good_match:
+                                            print(
+                                                f"[DEBUG] Selecting good match: {suggestion_text}")
+                                            print(
+                                                f"[DEBUG] Match details - Parts: {part_matches}, Indicators: {indicator_matches}")
+                                            try:
+                                                driver.execute_script(
+                                                    "arguments[0].scrollIntoView(true);", suggestion)
+                                                time.sleep(1)
+                                                driver.execute_script(
+                                                    "arguments[0].click();", suggestion)
+                                                suggestion_selected = True
+                                                time.sleep(3)
+                                                break
+                                            except Exception as click_error:
+                                                print(
+                                                    f"[DEBUG] JavaScript click failed: {click_error}")
+                                                try:
+                                                    suggestion.click()
+                                                    suggestion_selected = True
+                                                    time.sleep(3)
+                                                    break
+                                                except Exception as regular_click_error:
+                                                    print(
+                                                        f"[DEBUG] Regular click also failed: {regular_click_error}")
+
+                                    except Exception as suggestion_error:
+                                        print(
+                                            f"[DEBUG] Error processing suggestion {i+1}: {suggestion_error}")
+                                        continue
+
+                                # Enhanced fallback - try suggestions with any location part match
                                 if not suggestion_selected and suggestions:
                                     print(
-                                        f"[DEBUG] No perfect match, selecting first suggestion: {suggestions[0].text}")
-                                    driver.execute_script(
-                                        "arguments[0].click();", suggestions[0])
-                                    suggestion_selected = True
-                                    time.sleep(2)
+                                        "[DEBUG] Trying fallback with any part match...")
+                                    for suggestion in suggestions[:5]:
+                                        try:
+                                            suggestion_text = suggestion.text.strip()
+                                            suggestion_lower = suggestion_text.lower()
+
+                                            # Check if any of our location parts are in this suggestion
+                                            has_part_match = any(part.lower() in suggestion_lower
+                                                                 for part in all_location_parts
+                                                                 if len(part) > 3)
+
+                                            if has_part_match and len(suggestion_text) > 10:
+                                                print(
+                                                    f"[DEBUG] Fallback match: {suggestion_text}")
+                                                driver.execute_script(
+                                                    "arguments[0].click();", suggestion)
+                                                suggestion_selected = True
+                                                time.sleep(3)
+                                                break
+                                        except Exception as fallback_error:
+                                            print(
+                                                f"[DEBUG] Fallback click failed: {fallback_error}")
+                                            continue
 
                                 if suggestion_selected:
                                     break
 
                         except TimeoutException:
+                            print(
+                                f"[DEBUG] No suggestions found with selector: {selector}")
+                            continue
+                        except Exception as selector_error:
+                            print(
+                                f"[DEBUG] Error with selector {selector}: {selector_error}")
                             continue
 
-                except Exception as e:
-                    print(f"[DEBUG] Error finding suggestions: {e}")
+                    # Final fallback: try to find any clickable suggestion with location parts
+                    if not suggestion_selected:
+                        print("[DEBUG] Trying final broader suggestion search...")
+                        try:
+                            # Build XPath for all our location parts
+                            xpath_conditions = []
+                            xpath_conditions.append("contains(text(), 'ঢাকা')")
+                            xpath_conditions.append(
+                                "contains(text(), 'Dhaka')")
 
-                # If no suggestion was selected, try manual approach
-                if not suggestion_selected:
-                    print("[DEBUG] No suggestions found or selected. Trying manual approach...")
+                            for part in all_location_parts:
+                                if len(part) > 3:  # Only meaningful parts
+                                    escaped_part = part.replace("'", "\\'")
+                                    xpath_conditions.append(
+                                        f"contains(text(), '{escaped_part}')")
 
-                    # Look for any clickable elements that might be suggestions
-                    try:
-                        all_suggestions = driver.find_elements(
-                            By.XPATH, f"//*[contains(text(), '{primary_location}')]")
+                            xpath_query = f"//*[{' or '.join(xpath_conditions)}]"
+                            print(f"[DEBUG] Final XPath query: {xpath_query}")
 
-                        for suggestion in all_suggestions:
-                            suggestion_text = suggestion.text.strip()
-                            print(f"[DEBUG] Checking element: '{suggestion_text}'")
+                            all_elements = driver.find_elements(
+                                By.XPATH, xpath_query)
+                            print(
+                                f"[DEBUG] Found {len(all_elements)} elements in final search")
 
-                            # Check if this looks like a location suggestion
-                            if (len(suggestion_text) > 10 and
-                                primary_location.lower() in suggestion_text.lower() and
-                                    ("dhaka" in suggestion_text.lower() or "bangladesh" in suggestion_text.lower())):
-
+                            for element in all_elements[:5]:
                                 try:
-                                    # Try to click it
-                                    driver.execute_script(
-                                        "arguments[0].click();", suggestion)
-                                    print(
-                                        f"[DEBUG] Successfully clicked suggestion: {suggestion_text}")
-                                    suggestion_selected = True
-                                    time.sleep(2)
-                                    break
-                                except Exception as click_error:
-                                    print(
-                                        f"[DEBUG] Could not click suggestion: {click_error}")
+                                    element_text = element.text.strip()
+                                    if (len(element_text) > 10 and
+                                            len(element_text) < 200):
 
-                    except Exception as manual_error:
+                                        # Check if this element contains any of our location parts
+                                        element_lower = element_text.lower()
+                                        matching_parts = [part for part in all_location_parts
+                                                          if part.lower() in element_lower and len(part) > 3]
+
+                                        if matching_parts:
+                                            print(
+                                                f"[DEBUG] Final attempt - trying element with parts {matching_parts}: {element_text}")
+                                            driver.execute_script(
+                                                "arguments[0].click();", element)
+                                            suggestion_selected = True
+                                            time.sleep(3)
+                                            break
+                                except Exception as broad_error:
+                                    print(
+                                        f"[DEBUG] Final attempt failed: {broad_error}")
+                                    continue
+
+                        except Exception as broad_search_error:
+                            print(
+                                f"[DEBUG] Final search failed: {broad_search_error}")
+
+                    if suggestion_selected:
                         print(
-                            f"[DEBUG] Manual suggestion selection failed: {manual_error}")
+                            "[DEBUG] Successfully selected a location suggestion!")
+                    else:
+                        print("[DEBUG] Could not select any location suggestion")
 
-                # Only proceed if a suggestion was selected
-                if suggestion_selected:
-                    print("[DEBUG] Location suggestion selected, proceeding to submit...")
-
-                    # Now click the "Submit Location" button
-                    print("[DEBUG] Looking for Submit Location button in modal...")
-                    submit_button = wait.until(
-                        EC.element_to_be_clickable(
-                            (By.XPATH, "//button[contains(text(), 'Submit Location')]"))
-                    )
-
-                    print("[DEBUG] Clicking Submit Location button...")
-                    submit_button.click()
-
-                    # Wait for modal to close and navigation to happen
-                    print("[DEBUG] Waiting for modal to close and navigation...")
-                    time.sleep(8)
-
-                    # Wait for modal to disappear (fixed timeout parameter)
-                    try:
-                        WebDriverWait(driver, 10).until(
-                            EC.invisibility_of_element_located(
-                                (By.CSS_SELECTOR, "[role='dialog']"))
-                        )
-                        print("[DEBUG] Modal closed successfully")
-                    except TimeoutException:
-                        print("[DEBUG] Modal may still be visible or took longer to close")
-                else:
-                    print("[DEBUG] No suggestion was selected. Modal will likely stay open or close without navigation.")
-                    # Try to close modal by clicking X button
-                    try:
-                        close_button = driver.find_element(
-                            By.XPATH, "//button[@aria-label='Close'] | //*[contains(@class, 'close')]")
-                        close_button.click()
-                        print("[DEBUG] Closed modal manually")
-                        time.sleep(2)
-                    except:
-                        print("[DEBUG] Could not find close button")
+                except Exception as e:
+                    print(
+                        f"[DEBUG] Error in suggestion selection process: {e}")
 
 
             except TimeoutException:
@@ -710,4 +838,4 @@ class FoodiScraper(BaseScraper):
         except Exception as e:
             print(f"[DEBUG] Geocoding error: {e}")
 
-        return "Dhanmondi, Dhaka"
+        return ""

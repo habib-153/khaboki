@@ -70,6 +70,7 @@
 }
 
 :root {
+  --text-color: white;
   --radius: 0.625rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -77,7 +78,7 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
+  --primary: oklch(0.7 0.2 45);
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
@@ -104,7 +105,7 @@
   --sidebar-ring: oklch(0.708 0 0);
 
   /* Custom brand colors */
-  --brand-primary: oklch(0.4 0.2 250); /* Blue */
+  --brand-primary: rgb(244, 127, 32);
   --brand-secondary: oklch(0.6 0.15 280); /* Purple */
   --brand-accent: oklch(0.7 0.2 45); /* Orange */
   --brand-success: oklch(0.6 0.15 140); /* Green */

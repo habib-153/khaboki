@@ -7,8 +7,8 @@ from concurrent.futures import ThreadPoolExecutor
 class ScraperService:
     def __init__(self):
         self.scrapers = {
-            "foodpanda": FoodPandaScraper(),
             "foodi": FoodiScraper(),
+            "foodpanda": FoodPandaScraper(),
         }
         self.executor = ThreadPoolExecutor(max_workers=4)
 

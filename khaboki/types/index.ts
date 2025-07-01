@@ -21,14 +21,13 @@ export interface LocationCoordinates {
   lng: number;
 }
 
-export interface SearchFiltersType
- {
+export interface SearchFiltersType {
   cuisineType: string;
   minRating: number;
   maxDeliveryTime: number;
   platforms: string[];
   maxDeliveryFee?: number;
-  sortBy?: "rating" | "delivery_time" | "delivery_fee" | "name";
+  sortBy: "rating" | "delivery_time" | "offers";
 }
 
 export interface CacheInfo {
