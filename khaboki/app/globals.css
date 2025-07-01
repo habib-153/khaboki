@@ -70,7 +70,7 @@
 }
 
 :root {
-  --text-color: white;
+  --text-color: #ffffff;
   --radius: 0.625rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -105,7 +105,7 @@
   --sidebar-ring: oklch(0.708 0 0);
 
   /* Custom brand colors */
-  --brand-primary: rgb(244, 127, 32);
+  --brand-primary: #f47f20;
   --brand-secondary: oklch(0.6 0.15 280); /* Purple */
   --brand-accent: oklch(0.7 0.2 45); /* Orange */
   --brand-success: oklch(0.6 0.15 140); /* Green */
@@ -186,36 +186,65 @@
 }
 
 .pac-container {
-  background-color: white;
-  border-radius: 0.5rem;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  font-family: var(--font-geist-sans);
-  margin-top: 2px;
-  z-index: 1000 !important;
+  background-color: white !important;
+  border-radius: 0.5rem !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+  font-family: var(--font-geist-sans) !important;
+  margin-top: 2px !important;
+  z-index: 999999 !important;
+  position: absolute !important;
+  pointer-events: auto !important;
+  min-width: 250px !important;
 }
 
 .pac-item {
-  padding: 0.75rem 1rem;
-  cursor: pointer;
-  border-top: 1px solid #f7fafc;
+  padding: 0.75rem 1rem !important;
+  cursor: pointer !important;
+  border-top: 1px solid #f7fafc !important;
+  transition: background-color 0.2s ease !important;
+}
+
+.pac-item:first-child {
+  border-top: none !important;
 }
 
 .pac-item:hover {
-  background-color: #f7fafc;
+  background-color: #f7fafc !important;
+}
+
+.pac-item:active {
+  background-color: #edf2f7 !important;
 }
 
 .pac-item-query {
-  font-size: 0.925rem;
-  color: #1a202c;
+  font-size: 0.925rem !important;
+  color: #1a202c !important;
+  font-weight: 500 !important;
 }
 
 .pac-matched {
-  font-weight: 500;
+  font-weight: 600 !important;
+  color: #2d3748 !important;
 }
 
 .pac-icon {
-  margin-right: 0.75rem;
+  margin-right: 0.75rem !important;
+}
+
+/* Ensure modal dialog has correct z-index */
+[data-radix-dialog-content] {
+  z-index: 50 !important;
+}
+
+/* Ensure autocomplete items are clickable */
+.pac-container * {
+  pointer-events: auto !important;
+}
+
+/* Ensure modal content doesn't interfere */
+[data-radix-dialog-overlay] {
+  z-index: 49 !important;
 }
 
 @layer base {

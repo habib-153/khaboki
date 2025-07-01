@@ -110,7 +110,7 @@ class FoodiScraper(BaseScraper):
                             all_location_parts.append(clean_part)
                             # Also add cleaned version (remove common words)
                             cleaned = re.sub(
-                                r'\b(road|rd|street|st|embassy|embasy)\b', '', clean_part, flags=re.IGNORECASE).strip()
+                                r'\b(road|rd|street)\b', '', clean_part, flags=re.IGNORECASE).strip()
                             if cleaned and cleaned != clean_part:
                                 all_location_parts.append(cleaned)
 
@@ -131,10 +131,6 @@ class FoodiScraper(BaseScraper):
                         "//li[contains(text(), 'ঢাকা') or contains(text(), 'Dhaka')]",
                         "//div[contains(text(), 'ঢাকা') or contains(text(), 'Dhaka')]",
                         f"//*[contains(text(), {text}) or contains(text(), '{location_text}')]",
-                        # Broader search for any suggestions
-                        # "//*[@role='option']",
-                        # "//div[@role='listbox']//div",
-                        # "//ul[@role='listbox']//li"
                     ]
 
                     # Add dynamic selectors for each location part

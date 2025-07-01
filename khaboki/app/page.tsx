@@ -1,24 +1,21 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
-import { MapPin, Search, Loader2, RefreshCw, Sparkles } from "lucide-react";
+import { useState, useEffect } from "react";
+import { MapPin, Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Card,
-  CardContent,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { RestaurantCache } from "@/lib/RestaurantCache";
 import { EmptyState, LoadingState } from "@/components/Loading";
 import { RestaurantGrid } from "@/components/RestaurantGrid";
 import { ScrapeResults, SearchFiltersType } from "@/types";
-
+import { LocationModal } from "@/components/LocationModal";
+import logo from "@/public/1000083585.png"
 import { useSurpriseRestaurant } from "@/hooks/useSurpriseRestaurant";
 import { SurpriseModal } from "@/components/SurpriseModal";
+import Image from "next/image";
 
 export default function Home() {
   const [searchValue, setSearchValue] = useState<string>("");
@@ -44,6 +41,11 @@ export default function Home() {
     "rating"
   );
 
+  // Location modal state
+  const [showLocationModal, setShowLocationModal] = useState(false);
+  const [locationDisplayText, setLocationDisplayText] =
+    useState("Select location");
+
   const {
     getSurpriseRestaurant,
     surpriseRestaurant,
@@ -55,139 +57,30 @@ export default function Home() {
 
   const [showSurpriseModal, setShowSurpriseModal] = useState(false);
 
-  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const [cacheInfo, setCacheInfo] = useState<{
     hasCache: boolean;
     age?: number;
     location?: string;
   }>({ hasCache: false });
 
-  const [suggestions, setSuggestions] = useState<
-    google.maps.places.AutocompletePrediction[]
-  >([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-
-  // Map refs
-  const mapRef = useRef<google.maps.Map | null>(null);
-  const markerRef = useRef<google.maps.Marker | null>(null);
-  const mapContainerRef = useRef<HTMLDivElement | null>(null);
-
-  // Initialize map
-  const initializeMap = useCallback(() => {
-    if (!mapContainerRef.current) return;
-
-    const defaultCenter = { lat: 23.8103, lng: 90.4125 };
-
-    const mapOptions: google.maps.MapOptions = {
-      center: defaultCenter,
-      zoom: 14,
-      styles: [
-        {
-          featureType: "poi",
-          elementType: "labels",
-          stylers: [{ visibility: "off" }],
-        },
-      ],
-      mapTypeControl: false,
-      streetViewControl: false,
-      fullscreenControl: false,
-    };
-
-    const map = new window.google.maps.Map(mapContainerRef.current, mapOptions);
-    mapRef.current = map;
-
-    const marker = new window.google.maps.Marker({
-      position: defaultCenter,
-      map: map,
-      draggable: true,
-      animation: window.google.maps.Animation.DROP,
-    });
-    markerRef.current = marker;
-
-    marker.addListener("dragend", () => {
-      const position = marker.getPosition();
-      if (position) {
-        setSelectedLocation({
-          lat: position.lat(),
-          lng: position.lng(),
-        });
-      }
-    });
-
-    map.addListener("click", (e: google.maps.MapMouseEvent) => {
-      const clickedLocation = {
-        lat: e.latLng!.lat(),
-        lng: e.latLng!.lng(),
-      };
-
-      setSelectedLocation(clickedLocation);
-      marker.setPosition(clickedLocation);
-    });
-
-    const inputElement = document.getElementById(
-      "location-search"
-    ) as HTMLInputElement;
-    if (inputElement) {
-      const autocompleteOptions: google.maps.places.AutocompleteOptions = {
-        fields: ["address_components", "geometry", "name"],
-        types: ["address"],
-      };
-
-      const autocomplete = new window.google.maps.places.Autocomplete(
-        inputElement,
-        autocompleteOptions
-      );
-
-      autocomplete.bindTo("bounds", map);
-      autocompleteRef.current = autocomplete;
-
-      autocomplete.addListener("place_changed", () => {
-        const place = autocomplete.getPlace();
-
-        if (!place.geometry || !place.geometry.location) {
-          setError("No location details available for this address");
-          return;
-        }
-
-        const location = {
-          lat: place.geometry.location.lat(),
-          lng: place.geometry.location.lng(),
-        };
-
-        setSelectedLocation(location);
-        map.setCenter(location);
-        marker.setPosition(location);
-        map.setZoom(17);
-
-        setSuggestions([]);
-        setShowSuggestions(false);
-      });
-    }
-  }, []);
-
   // Load Google Maps script
   useEffect(() => {
     const loadGoogleMapsScript = () => {
+      if (document.querySelector('script[src*="maps.googleapis.com"]')) {
+        return; // Script already loaded
+      }
+
       const googleMapScript = document.createElement("script");
-      googleMapScript.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places&callback=initMap`;
+      googleMapScript.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`;
       googleMapScript.async = true;
       googleMapScript.defer = true;
       window.document.body.appendChild(googleMapScript);
-
-      window.initMap = initializeMap;
-
-      return () => {
-        window.document.body.removeChild(googleMapScript);
-        delete window.initMap;
-      };
     };
 
     if (!window.google) {
       loadGoogleMapsScript();
-    } else {
-      initializeMap();
     }
-  }, [initializeMap]);
+  }, []);
 
   useEffect(() => {
     const cached = RestaurantCache.load();
@@ -195,15 +88,15 @@ export default function Home() {
       setRestaurants(cached.restaurants as ScrapeResults);
       setSelectedLocation(cached.location);
       setSearchValue(cached.searchText);
+      setLocationDisplayText(cached.searchText || "Location selected");
       setCacheInfo(RestaurantCache.getCacheInfo());
     }
   }, []);
 
   const fetchRestaurants = async (forceRefresh = false) => {
-    const currentLocation = selectedLocation 
-    const currentSearchText = searchValue 
-console.log(currentLocation, currentSearchText);
-
+    const currentLocation = selectedLocation;
+    const currentSearchText = searchValue
+console.log(currentSearchText)
     if (!currentLocation) {
       setError("Please select a location first");
       return;
@@ -231,11 +124,6 @@ console.log(currentLocation, currentSearchText);
         headers: {
           "Content-Type": "application/json",
         },
-        // body: JSON.stringify({
-        //   lat: 23.8103,
-        //   lng: 90.4125,
-        //   text: "Matikata",
-        // }),
         body: JSON.stringify({
           lat: currentLocation.lat,
           lng: currentLocation.lng,
@@ -267,6 +155,31 @@ console.log(currentLocation, currentSearchText);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleLocationSelect = (
+    location: { lat: number; lng: number },
+    address: string
+  ) => {
+    setSelectedLocation(location);
+    setSearchValue(address);
+    setLocationDisplayText(address.split(",")[0] || address); 
+    // setTimeout(() => fetchRestaurants(), 100);
+  };
+
+  const handleConfirmLocationAndSearch = (
+    location: { lat: number; lng: number },
+    address: string
+  ) => {
+    setSelectedLocation(location);
+    // setSearchValue(address.split(",")[0] || address);
+    setSearchValue(address);
+    setLocationDisplayText(address);
+    console.log("🎯 handleConfirmLocationAndSearch called with:", {
+      location,
+      address,
+    });
+    setTimeout(() => fetchRestaurants(), 100);
   };
 
   const clearCache = () => {
@@ -301,131 +214,60 @@ console.log(currentLocation, currentSearchText);
   return (
     <div className="min-h-screen bg-surface-50">
       {/* Modern Header */}
-      <header className="bg-brand-primary/80 backdrop-blur-lg border-b border-surface-200 sticky top-0 z-40">
+      <header className="bg-brand-primary backdrop-blur-lg border-b border-surface-200 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between py-4">
+          <div className="flex items-center justify-between">
             {/* Logo and Title */}
-            <div className="flex items-center space-x-3">
+            <Image src={logo} alt="logo" height={50} width={200} />
+            {/* <div className="flex items-center space-x-3">
               <div className="w-10 h-10 bg-gradient-to-br from-brand-primary to-brand-secondary rounded-xl flex items-center justify-center">
                 <span className="text-white font-bold text-lg">K</span>
               </div>
               <div>
-                <h1 className="text-2xl text-white font-bold ">Khabo ki?</h1>
-                <p className="text-white  text-sm">Find your perfect meal</p>
+                <h1 className="text-2xl text-white font-bold">Khabo ki?</h1>
+                <p className="text-white text-sm">Find your perfect meal</p>
+              </div>
+            </div> */}
+
+            {/* Location Search */}
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowLocationModal(true)}
+                  className="bg-white border-white/20 text-brand-primary hover:text-primary hover:bg-white backdrop-blur-sm min-w-[200px] justify-start"
+                >
+                  <MapPin size={16} className="mr-2" />
+                  <span className="truncate">
+                    {locationDisplayText.length > 20
+                      ? `${locationDisplayText.substring(0, 20)}...`
+                      : locationDisplayText}
+                  </span>
+                </Button>
+
+                {hasResults && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fetchRestaurants(true)}
+                    disabled={isLoading}
+                    className="bg-white/10 border-white/20 text-white hover:bg-white/20 backdrop-blur-sm"
+                  >
+                    {isLoading ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      <RefreshCw size={16} />
+                    )}
+                  </Button>
+                )}
               </div>
             </div>
-
-            {/* Cache Info */}
-            {/* {cacheInfo.hasCache && (
-              <div className="flex items-center gap-3 text-white">
-                <Badge
-                  variant="outline"
-                  className="bg-brand-success/10 border-brand-success/20"
-                >
-                  <div className="w-2 h-2 bg-brand-success rounded-full mr-2"></div>
-                  Cached {cacheInfo.age}m ago
-                </Badge>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={clearCache}
-                  className=" hover:text-surface-900"
-                >
-                  Clear Cache
-                </Button>
-              </div>
-            )} */}
           </div>
         </div>
       </header>
 
       {/* Main content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        {/* Location Selection Card */}
-        <Card className="border-0 shadow-lg bg-white/70 backdrop-blur-sm">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-xl font-semibold text-brand-primary">
-                  Select your location
-                </h2>
-                <p className="text-surface-600 text-sm mt-1">
-                  Choose where you want to order from
-                </p>
-              </div>
-              {hasResults && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => fetchRestaurants(true)}
-                  className="flex items-center gap-2 border-brand-primary/20 text-brand-primary hover:bg-brand-primary/5"
-                >
-                  <RefreshCw size={16} />
-                  Refresh
-                </Button>
-              )}
-            </div>
-
-            {/* Search input */}
-            <div className="mb-6 flex gap-3">
-              <div className="relative flex-1">
-                <Input
-                  id="location-search"
-                  placeholder="Enter your address..."
-                  value={searchValue}
-                  onChange={(e) => setSearchValue(e.target.value)}
-                  className="pl-10 h-12 border-surface-300 focus:border-brand-primary focus:ring-brand-primary/20"
-                />
-                <MapPin
-                  size={18}
-                  className="absolute left-3 top-1/2 transform -translate-y-1/2 text-surface-400"
-                />
-              </div>
-              <Button
-                onClick={() => fetchRestaurants()}
-                disabled={isLoading}
-                className="h-12 px-6 "
-              >
-                {isLoading ? (
-                  <Loader2 size={18} className="animate-spin" />
-                ) : (
-                  <Search size={18} />
-                )}
-              </Button>
-            </div>
-
-            {/* Map container */}
-            <div
-              ref={mapContainerRef}
-              className="w-full h-[300px] rounded-xl border border-surface-200 overflow-hidden"
-            ></div>
-
-            {/* Location info */}
-            {selectedLocation && (
-              <div className="mt-4 flex justify-between items-center p-4 bg-surface-100 rounded-lg">
-                <p className="text-sm text-surface-600">
-                  📍 Selected: {selectedLocation.lat.toFixed(5)},{" "}
-                  {selectedLocation.lng.toFixed(5)}
-                </p>
-                <Button
-                  onClick={() => fetchRestaurants()}
-                  disabled={isLoading}
-                  className=""
-                >
-                  {isLoading ? (
-                    <span className="flex items-center">
-                      <Loader2 size={18} className="mr-2 animate-spin" />
-                      Finding restaurants...
-                    </span>
-                  ) : (
-                    "Find Restaurants"
-                  )}
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
         {/* Error message */}
         {error && (
           <Alert
@@ -527,8 +369,30 @@ console.log(currentLocation, currentSearchText);
           </div>
         )}
 
+        {!isLoading && !hasResults && !selectedLocation && (
+          <div className="text-center py-12">
+            <MapPin size={48} className="mx-auto text-surface-400 mb-4" />
+            <h3 className="text-lg font-medium text-surface-900 mb-2">
+              Select Your Location
+            </h3>
+            <p className="text-surface-600 mb-6">
+              Click on the location button in the header to get started
+            </p>
+          </div>
+        )}
+
         {!isLoading && !hasResults && restaurants && <EmptyState />}
       </main>
+
+      {/* Location Modal */}
+      <LocationModal
+        isOpen={showLocationModal}
+        onClose={() => setShowLocationModal(false)}
+        onLocationSelect={handleConfirmLocationAndSearch} 
+        initialLocation={selectedLocation}
+        initialAddress={searchValue}
+        isLoading={isLoading}
+      />
 
       <SurpriseModal
         isOpen={showSurpriseModal}
