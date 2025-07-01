@@ -1006,5 +1006,42 @@ def dataset_stats():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
+
+@app.route('/migrate-database', methods=['GET'])
+def migrate_database():
+    """Migrate existing database to new quality standards"""
+    try:
+        # Just analyze first
+        analysis = dataset_builder.run_migration_safely()
+        return jsonify({
+            "success": True,
+            "message": "Database analysis completed",
+            "analysis": analysis,
+            "recommendation": "Run POST /api/migrate-database/execute to apply changes"
+        })
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@app.route('/migrate-database/execute', methods=['POST'])
+def execute_migration():
+    """Execute the actual migration (creates backup first)"""
+    try:
+        dataset_builder.migrate_existing_database()
+        stats = dataset_builder.get_stats()
+        return jsonify({
+            "success": True,
+            "message": "Migration completed successfully",
+            "stats": stats
+        })
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+    
 if __name__ == '__main__':
     app.run(debug=True)

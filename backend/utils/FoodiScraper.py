@@ -95,7 +95,8 @@ class FoodiScraper(BaseScraper):
                 
                 # Wait for and select from dropdown suggestions
                 print("[DEBUG] Looking for location dropdown suggestions...")
-                print("[DEBUG] Looking for location dropdown suggestions...")
+
+
                 suggestion_selected = False
 
                 try:
@@ -114,39 +115,46 @@ class FoodiScraper(BaseScraper):
                             if cleaned and cleaned != clean_part:
                                 all_location_parts.append(cleaned)
 
-                    print(
-                        f"[DEBUG] All location parts to search: {all_location_parts}")
+                    print(f"[DEBUG] All location parts to search: {all_location_parts}")
 
                     # Wait for suggestions to appear
                     time.sleep(5)
 
-                    # Build dynamic selectors based on all location parts
+                    # Build specific selectors based on the actual Foodi structure
                     suggestion_selectors = [
-                        # Standard autocomplete dropdowns
-                        "//div[contains(@class, 'p-autocomplete-items')]//li",
-                        "//div[contains(@class, 'p-autocomplete-panel')]//li",
-                        "//ul[contains(@class, 'p-autocomplete-items')]//li",
+                        # Primary selector based on your provided XPath
+                        "//*[@id='pr_id_1_content']/div/div[1]/div[2]/ul/li",
 
-                        # Generic list items that might contain locations
+                        # Variations of the primary selector
+                        "//div[@id='pr_id_1_content']//ul//li",
+                        "//div[contains(@id, 'pr_id_')]//ul//li",
+
+                        # Generic PrimeNG autocomplete patterns (Foodi uses PrimeNG)
+                        "//div[contains(@class, 'p-autocomplete-panel')]//ul//li",
+                        "//ul[contains(@class, 'p-autocomplete-items')]//li",
+                        "//div[contains(@class, 'p-autocomplete-items')]//li",
+
+                        # More specific patterns
+                        "//div[contains(@id, 'content')]//ul//li",
+                        "//li[contains(@class, 'p-autocomplete-item')]",
+
+                        # Fallback patterns
                         "//li[contains(text(), 'ঢাকা') or contains(text(), 'Dhaka')]",
                         "//div[contains(text(), 'ঢাকা') or contains(text(), 'Dhaka')]",
-                        f"//*[contains(text(), {text}) or contains(text(), '{location_text}')]",
                     ]
 
                     # Add dynamic selectors for each location part
                     for part in all_location_parts:
                         if len(part) > 2:  # Only add meaningful parts
-                            # Escape single quotes in the part for XPath
                             escaped_part = part.replace("'", "\\'")
                             suggestion_selectors.append(
-                                f"//*[contains(text(), '{escaped_part}')]")
+                                f"//li[contains(text(), '{escaped_part}')]")
 
                     for selector in suggestion_selectors:
                         try:
                             print(f"[DEBUG] Trying selector: {selector}")
                             suggestions = WebDriverWait(driver, 3).until(
-                                EC.presence_of_all_elements_located(
-                                    (By.XPATH, selector))
+                                EC.presence_of_all_elements_located((By.XPATH, selector))
                             )
 
                             if suggestions:
@@ -157,17 +165,19 @@ class FoodiScraper(BaseScraper):
                                 for i, suggestion in enumerate(suggestions[:10]):
                                     try:
                                         suggestion_text = suggestion.text.strip()
-                                        print(
-                                            f"[DEBUG] Suggestion {i+1}: '{suggestion_text}'")
+                                        print(f"[DEBUG] Suggestion {i+1}: '{suggestion_text}'")
                                     except:
-                                        print(
-                                            f"[DEBUG] Suggestion {i+1}: Could not get text")
+                                        print(f"[DEBUG] Suggestion {i+1}: Could not get text")
 
                                 # Enhanced matching logic using all location parts
                                 for i, suggestion in enumerate(suggestions[:10]):
                                     try:
                                         suggestion_text = suggestion.text.strip()
                                         suggestion_lower = suggestion_text.lower()
+
+                                        # Skip empty suggestions
+                                        if not suggestion_text:
+                                            continue
 
                                         # Check how many of our location parts match this suggestion
                                         part_matches = 0
@@ -183,7 +193,7 @@ class FoodiScraper(BaseScraper):
 
                                         # Check for location indicators
                                         location_indicators = [
-                                            'ঢাকা', 'dhaka', 'bangladesh', 'বাংলাদেশ', {text},
+                                            'ঢাকা', 'dhaka', 'bangladesh', 'বাংলাদেশ',
                                             '১২১২', '1212'
                                         ]
 
@@ -207,19 +217,16 @@ class FoodiScraper(BaseScraper):
                                         elif indicator_matches >= 2:
                                             # If multiple location indicators match
                                             is_good_match = True
-                                            print(
-                                                f"[DEBUG] Good match - multiple indicators")
+                                            print(f"[DEBUG] Good match - multiple indicators")
                                         elif (('ঢাকা' in suggestion_lower or 'dhaka' in suggestion_lower) and
-                                              len(suggestion_text) > 15):
+                                            len(suggestion_text) > 15):
                                             # Fallback for long Dhaka addresses
                                             is_good_match = True
-                                            print(
-                                                f"[DEBUG] Good match - long Dhaka address")
+                                            print(f"[DEBUG] Good match - long Dhaka address")
                                         elif ('bangladesh' in suggestion_lower or 'বাংলাদেশ' in suggestion_lower):
                                             # Any Bangladesh address
                                             is_good_match = True
-                                            print(
-                                                f"[DEBUG] Good match - Bangladesh address")
+                                            print(f"[DEBUG] Good match - Bangladesh address")
 
                                         if is_good_match:
                                             print(
@@ -227,25 +234,46 @@ class FoodiScraper(BaseScraper):
                                             print(
                                                 f"[DEBUG] Match details - Parts: {part_matches}, Indicators: {indicator_matches}")
                                             try:
+                                                # Scroll the suggestion into view
                                                 driver.execute_script(
                                                     "arguments[0].scrollIntoView(true);", suggestion)
                                                 time.sleep(1)
-                                                driver.execute_script(
-                                                    "arguments[0].click();", suggestion)
+
+                                                # Try multiple click methods for better reliability
+                                                try:
+                                                    # Method 1: JavaScript click
+                                                    driver.execute_script(
+                                                        "arguments[0].click();", suggestion)
+                                                    print("[DEBUG] JavaScript click successful")
+                                                except Exception as js_error:
+                                                    print(
+                                                        f"[DEBUG] JavaScript click failed: {js_error}")
+                                                    try:
+                                                        # Method 2: Regular click
+                                                        suggestion.click()
+                                                        print(
+                                                            "[DEBUG] Regular click successful")
+                                                    except Exception as regular_error:
+                                                        print(
+                                                            f"[DEBUG] Regular click failed: {regular_error}")
+                                                        try:
+                                                            # Method 3: Action chains
+                                                            from selenium.webdriver.common.action_chains import ActionChains
+                                                            ActionChains(driver).move_to_element(
+                                                                suggestion).click().perform()
+                                                            print(
+                                                                "[DEBUG] ActionChains click successful")
+                                                        except Exception as action_error:
+                                                            print(
+                                                                f"[DEBUG] ActionChains click failed: {action_error}")
+                                                            continue
+
                                                 suggestion_selected = True
                                                 time.sleep(3)
                                                 break
                                             except Exception as click_error:
                                                 print(
-                                                    f"[DEBUG] JavaScript click failed: {click_error}")
-                                                try:
-                                                    suggestion.click()
-                                                    suggestion_selected = True
-                                                    time.sleep(3)
-                                                    break
-                                                except Exception as regular_click_error:
-                                                    print(
-                                                        f"[DEBUG] Regular click also failed: {regular_click_error}")
+                                                    f"[DEBUG] All click methods failed: {click_error}")
 
                                     except Exception as suggestion_error:
                                         print(
@@ -254,8 +282,7 @@ class FoodiScraper(BaseScraper):
 
                                 # Enhanced fallback - try suggestions with any location part match
                                 if not suggestion_selected and suggestions:
-                                    print(
-                                        "[DEBUG] Trying fallback with any part match...")
+                                    print("[DEBUG] Trying fallback with any part match...")
                                     for suggestion in suggestions[:5]:
                                         try:
                                             suggestion_text = suggestion.text.strip()
@@ -263,95 +290,84 @@ class FoodiScraper(BaseScraper):
 
                                             # Check if any of our location parts are in this suggestion
                                             has_part_match = any(part.lower() in suggestion_lower
-                                                                 for part in all_location_parts
-                                                                 if len(part) > 3)
+                                                                for part in all_location_parts
+                                                                if len(part) > 3)
 
                                             if has_part_match and len(suggestion_text) > 10:
                                                 print(
                                                     f"[DEBUG] Fallback match: {suggestion_text}")
-                                                driver.execute_script(
-                                                    "arguments[0].click();", suggestion)
-                                                suggestion_selected = True
-                                                time.sleep(3)
-                                                break
+                                                try:
+                                                    driver.execute_script(
+                                                        "arguments[0].scrollIntoView(true);", suggestion)
+                                                    time.sleep(1)
+                                                    driver.execute_script(
+                                                        "arguments[0].click();", suggestion)
+                                                    suggestion_selected = True
+                                                    time.sleep(3)
+                                                    break
+                                                except Exception as fallback_error:
+                                                    print(
+                                                        f"[DEBUG] Fallback click failed: {fallback_error}")
+                                                    continue
                                         except Exception as fallback_error:
                                             print(
-                                                f"[DEBUG] Fallback click failed: {fallback_error}")
+                                                f"[DEBUG] Fallback processing failed: {fallback_error}")
                                             continue
 
                                 if suggestion_selected:
                                     break
 
                         except TimeoutException:
-                            print(
-                                f"[DEBUG] No suggestions found with selector: {selector}")
+                            print(f"[DEBUG] No suggestions found with selector: {selector}")
                             continue
                         except Exception as selector_error:
-                            print(
-                                f"[DEBUG] Error with selector {selector}: {selector_error}")
+                            print(f"[DEBUG] Error with selector {selector}: {selector_error}")
                             continue
 
-                    # Final fallback: try to find any clickable suggestion with location parts
+                    # Final specific fallback using the exact XPath pattern you provided
                     if not suggestion_selected:
-                        print("[DEBUG] Trying final broader suggestion search...")
+                        print("[DEBUG] Trying final fallback with specific Foodi XPath...")
                         try:
-                            # Build XPath for all our location parts
-                            xpath_conditions = []
-                            xpath_conditions.append("contains(text(), 'ঢাকা')")
-                            xpath_conditions.append(
-                                "contains(text(), 'Dhaka')")
+                            # Use the exact XPath structure you provided
+                            specific_suggestions = driver.find_elements(
+                                By.XPATH,
+                                "//*[@id='pr_id_1_content']/div/div[1]/div[2]/ul/li | //div[contains(@id, 'pr_id_')]/div/div[1]/div[2]/ul/li"
+                            )
 
-                            for part in all_location_parts:
-                                if len(part) > 3:  # Only meaningful parts
-                                    escaped_part = part.replace("'", "\\'")
-                                    xpath_conditions.append(
-                                        f"contains(text(), '{escaped_part}')")
-
-                            xpath_query = f"//*[{' or '.join(xpath_conditions)}]"
-                            print(f"[DEBUG] Final XPath query: {xpath_query}")
-
-                            all_elements = driver.find_elements(
-                                By.XPATH, xpath_query)
                             print(
-                                f"[DEBUG] Found {len(all_elements)} elements in final search")
+                                f"[DEBUG] Found {len(specific_suggestions)} suggestions with specific XPath")
 
-                            for element in all_elements[:5]:
+                            for suggestion in specific_suggestions[:5]:
                                 try:
-                                    element_text = element.text.strip()
-                                    if (len(element_text) > 10 and
-                                            len(element_text) < 200):
+                                    suggestion_text = suggestion.text.strip()
+                                    if (suggestion_text and
+                                        len(suggestion_text) > 10 and
+                                            ('ঢাকা' in suggestion_text.lower() or 'dhaka' in suggestion_text.lower())):
 
-                                        # Check if this element contains any of our location parts
-                                        element_lower = element_text.lower()
-                                        matching_parts = [part for part in all_location_parts
-                                                          if part.lower() in element_lower and len(part) > 3]
-
-                                        if matching_parts:
-                                            print(
-                                                f"[DEBUG] Final attempt - trying element with parts {matching_parts}: {element_text}")
-                                            driver.execute_script(
-                                                "arguments[0].click();", element)
-                                            suggestion_selected = True
-                                            time.sleep(3)
-                                            break
-                                except Exception as broad_error:
-                                    print(
-                                        f"[DEBUG] Final attempt failed: {broad_error}")
+                                        print(
+                                            f"[DEBUG] Final attempt - selecting: {suggestion_text}")
+                                        driver.execute_script(
+                                            "arguments[0].scrollIntoView(true);", suggestion)
+                                        time.sleep(1)
+                                        driver.execute_script(
+                                            "arguments[0].click();", suggestion)
+                                        suggestion_selected = True
+                                        time.sleep(3)
+                                        break
+                                except Exception as final_error:
+                                    print(f"[DEBUG] Final attempt failed: {final_error}")
                                     continue
 
-                        except Exception as broad_search_error:
-                            print(
-                                f"[DEBUG] Final search failed: {broad_search_error}")
+                        except Exception as specific_error:
+                            print(f"[DEBUG] Specific XPath fallback failed: {specific_error}")
 
                     if suggestion_selected:
-                        print(
-                            "[DEBUG] Successfully selected a location suggestion!")
+                        print("[DEBUG] Successfully selected a location suggestion!")
                     else:
-                        print("[DEBUG] Could not select any location suggestion")
+                        print("[DEBUG] Could not select any location suggestion - will proceed anyway")
 
                 except Exception as e:
-                    print(
-                        f"[DEBUG] Error in suggestion selection process: {e}")
+                    print(f"[DEBUG] Error in suggestion selection process: {e}")
 
 
             except TimeoutException:

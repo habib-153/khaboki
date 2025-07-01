@@ -157,16 +157,6 @@ console.log(currentSearchText)
     }
   };
 
-  const handleLocationSelect = (
-    location: { lat: number; lng: number },
-    address: string
-  ) => {
-    setSelectedLocation(location);
-    setSearchValue(address);
-    setLocationDisplayText(address.split(",")[0] || address); 
-    // setTimeout(() => fetchRestaurants(), 100);
-  };
-
   const handleConfirmLocationAndSearch = (
     location: { lat: number; lng: number },
     address: string
@@ -219,15 +209,6 @@ console.log(currentSearchText)
           <div className="flex items-center justify-between">
             {/* Logo and Title */}
             <Image src={logo} alt="logo" height={50} width={200} />
-            {/* <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-brand-primary to-brand-secondary rounded-xl flex items-center justify-center">
-                <span className="text-white font-bold text-lg">K</span>
-              </div>
-              <div>
-                <h1 className="text-2xl text-white font-bold">Khabo ki?</h1>
-                <p className="text-white text-sm">Find your perfect meal</p>
-              </div>
-            </div> */}
 
             {/* Location Search */}
             <div className="flex items-center gap-4">
@@ -245,7 +226,7 @@ console.log(currentSearchText)
                   </span>
                 </Button>
 
-                {hasResults && (
+                {/* {hasResults && (
                   <Button
                     variant="outline"
                     size="sm"
@@ -259,7 +240,7 @@ console.log(currentSearchText)
                       <RefreshCw size={16} />
                     )}
                   </Button>
-                )}
+                )} */}
               </div>
             </div>
           </div>
@@ -269,7 +250,7 @@ console.log(currentSearchText)
       {/* Main content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         {/* Error message */}
-        {error && (
+        {/* {error && (
           <Alert
             variant="destructive"
             className="border-brand-danger/20 bg-brand-danger/5"
@@ -278,7 +259,7 @@ console.log(currentSearchText)
               {error}
             </AlertDescription>
           </Alert>
-        )}
+        )} */}
 
         {isLoading && <LoadingState />}
 
