@@ -60,9 +60,9 @@ export function SurpriseModal({
                   <RefreshCw size={16} className="mr-2" />
                   Try Another
                 </Button>
-                <Button onClick={onClose} className="flex-1">
+                {/* <Button onClick={onClose} className="flex-1">
                   I&apos;ll Try This!
-                </Button>
+                </Button> */}
               </div>
 
               {previousCount > 1 && (
